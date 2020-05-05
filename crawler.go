@@ -5,9 +5,9 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"github.com/imfht/req"
 	"github.com/joeguo/tldextract"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,7 +27,7 @@ type Fetcher struct {
 	WithTld        bool   `long:"with-tld" description:"是否输出TLD"`
 	WithIP         bool   `long:"with-ip" description:"是否输出IP"`
 	WithHeaders    bool   `long:"with-headers" description:"是否输出Headers"`
-	//WithCert       bool   `long:"with-cert" description:"是否输出HTTPS证书"`
+	//WithCert       bool   `long:"with-cert" description:"是否输出HTTPS证书"` todo: add  cert support.
 	WithLinks bool `long:"with-links" description:"是否输出链接信息"`
 }
 
@@ -149,17 +149,31 @@ func (fetcher *Fetcher) DNSInfo(input chan string, output chan DNSInfo, group *s
 		}
 	}
 }
-func OutputWorker(output chan Response, group *sync.WaitGroup) {
+
+func (fetcher *Fetcher) OutputWorker(output chan Response, group *sync.WaitGroup) {
 	defer group.Done()
-	var enc = json.NewEncoder(os.Stdout)
+	//var pipe io.Writer
+	var pipe *os.File
+	var err error
+	if fetcher.OutputFileName == "-" {
+		pipe = os.Stdout
+	} else {
+		pipe, err = os.OpenFile(fetcher.OutputFileName, os.O_WRONLY|os.O_CREATE, 0666)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	var enc = json.NewEncoder(pipe)
 	enc.SetEscapeHTML(false)
+	defer pipe.Close()
+	defer pipe.Sync()
 	for {
 		select {
 		case response, ok := <-output:
 			if ok {
-				buf := new(bytes.Buffer)
-				if err := enc.Encode(&response); err == nil {
-					fmt.Print(buf.String())
+				//buf := new(bytes.Buffer)
+				if err = enc.Encode(&response); err != nil {
+					log.Fatal(err)
 				}
 			} else {
 				return
@@ -182,11 +196,24 @@ func (fetcher *Fetcher) Process() {
 		fetchWg.Add(1)
 	}
 	outputWg.Add(1)
-	go OutputWorker(outputChan, &outputWg)
-
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		inputChan <- scanner.Text()
+	go fetcher.OutputWorker(outputChan, &outputWg)
+	var scanner *os.File
+	if fetcher.InputFileName == "-" {
+		scanner = os.Stdin
+	} else {
+		var err error
+		scanner, err = os.Open(fetcher.InputFileName)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	f := bufio.NewScanner(scanner)
+	for f.Scan() {
+		inputTxt := f.Text()
+		if !strings.HasPrefix(inputTxt, "http") {
+			inputTxt = "http://" + inputTxt
+		}
+		inputChan <- inputTxt
 	}
 	close(inputChan)
 	fetchWg.Wait()
