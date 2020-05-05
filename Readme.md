@@ -9,6 +9,9 @@ Thanks for [zgrab2](https://github.com/zmap/zgrab2)!
 - easy to use
 - json output
 
+# can be used to
+- send lots of http request to a list of urls.
+ 
 ## usage
 ```bash
 » go run main.go -h                                                                                                              1 ↵ cat@jinxufang-LC2
