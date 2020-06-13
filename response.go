@@ -20,6 +20,8 @@ type Response struct {
 	SourceURL   string   `json:"source_url,omitempty"`
 	Tld         string   `json:"tld,omitempty"`
 	Headers     string   `json:"headers,omitempty"`
+	B64Content  string   `json:"b64"`
+	Hash        string   `json:"hash"`
 	//Cert       cert.Cert `json:"cert"`
 }
 type DNSInfo struct {

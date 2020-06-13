@@ -3,8 +3,11 @@ package coolCrawler
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha1"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/imfht/req"
 	"github.com/joeguo/tldextract"
 	"log"
@@ -26,6 +29,7 @@ type Fetcher struct {
 	WithHTML       bool   `long:"with-html" description:"是否输出HTML"`
 	WithTld        bool   `long:"with-tld" description:"是否输出TLD"`
 	WithIP         bool   `long:"with-ip" description:"是否输出IP"`
+	IconMode       bool   `long:"icon-mode" description:"输出Body的base64和hash"`
 	WithHeaders    bool   `long:"with-headers" description:"是否输出Headers"`
 	//WithCert       bool   `long:"with-cert" description:"是否输出HTTPS证书"` todo: add  cert support.
 	WithLinks bool `long:"with-links" description:"是否输出链接信息"`
@@ -84,18 +88,22 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 		return Response{Succeed: false, ErrorReason: err.Error(), URL: targetUrl, SourceURL: targetUrl, Time: JSONTime(time.Now())}
 	}
 	html, _ := rawResp.ToString()
-	if fixedHtml, err := FixEncoding(html, rawResp.Response().Header.Get("Content-Type")); err == nil {
-		html = fixedHtml
-	}
-
 	statusCode := rawResp.Response().StatusCode
-
 	response := Response{
 		URL:        rawResp.Request().URL.String(),
 		StatusCode: statusCode,
 		Succeed:    true,
 		Time:       JSONTime(time.Now()),
 		SourceURL:  targetUrl,
+	}
+	if fetcher.IconMode {
+		encoded := base64.StdEncoding.EncodeToString(rawResp.Bytes())
+		response.B64Content = encoded
+		response.Hash = fmt.Sprintf("%x", sha1.Sum(rawResp.Bytes()))
+		return response
+	}
+	if fixedHtml, err := FixEncoding(html, rawResp.Response().Header.Get("Content-Type")); err == nil {
+		html = fixedHtml
 	}
 	if fetcher.WithLinks {
 		rawLinks := getLinks(html, targetUrl)
