@@ -16,5 +16,5 @@ gofmt:
 
 punkspider: $(GO_FILES)
 	cd cmd/ && go build -o punk_crawler$(EXECUTABLE_EXTENSION) && cd ../..
-	rm -f punk_crawler2
+	rm -f punk_crawler
 	ln -s cmd/punk_crawler$(EXECUTABLE_EXTENSION) punk_crawler
