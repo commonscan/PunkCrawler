@@ -80,7 +80,7 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 	}
 
 	for i := 0; i <= fetcher.Retries; i++ {
-		rawResp, err = req.Get(targetUrl, req.Header{"User-Agent": fetcher.UserAgent})
+		rawResp, err = r.Get(targetUrl, req.Header{"User-Agent": fetcher.UserAgent})
 		if err == nil {
 			break
 		}
