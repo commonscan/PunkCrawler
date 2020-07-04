@@ -22,7 +22,7 @@ import (
 type Fetcher struct {
 	InputFileName  string `short:"i" long:"input-file" description:"输入文件名" default:"-"`
 	OutputFileName string `short:"o" long:"output-file" description:"输出文件名" default:"-"`
-	ProcessNum     int    `short:"p" long:"process_num" description:"并发数" default:"100"`
+	ProcessNum     int    `short:"p" long:"process-num" description:"并发数" default:"100"`
 	Timeout        int32  `short:"t" long:"timeout" description:"最大超时数(s)" default:"30"`
 	Retries        int    `short:"r" long:"retries" description:"最大重试次数" default:"2"`
 	WithTitle      bool   `long:"with-title" description:"是否输出Title"`
@@ -31,8 +31,9 @@ type Fetcher struct {
 	WithIP         bool   `long:"with-ip" description:"是否输出IP"`
 	IconMode       bool   `long:"icon-mode" description:"输出Body的base64和hash"`
 	WithHeaders    bool   `long:"with-headers" description:"是否输出Headers"`
-	//WithCert       bool   `long:"with-cert" description:"是否输出HTTPS证书"` todo: add  cert support.
-	WithLinks bool `long:"with-links" description:"是否输出链接信息"`
+	UserAgent      string `long:"user-agent" description:"User-Agent" default:"Mozilla/5.0 (compatible;Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)"`
+	WithCert       bool   `long:"with-cert" description:"是否输出HTTPS证书"`
+	WithLinks      bool   `long:"with-links" description:"是否输出链接信息"`
 }
 
 var (
@@ -79,7 +80,7 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 	}
 
 	for i := 0; i <= fetcher.Retries; i++ {
-		rawResp, err = req.Get(targetUrl, req.Header{"User-Agent": "Mozilla/5.0 (compatible;Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)"})
+		rawResp, err = req.Get(targetUrl, req.Header{"User-Agent": fetcher.UserAgent})
 		if err == nil {
 			break
 		}
@@ -95,6 +96,15 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 		Succeed:    true,
 		Time:       JSONTime(time.Now()),
 		SourceURL:  targetUrl,
+	}
+	if fetcher.WithCert && strings.HasPrefix(rawResp.Request().URL.String(), "https://") {
+		var cert_interface map[string]interface{}
+		inrec, _ := json.Marshal(rawResp.Response().TLS.PeerCertificates[0])
+		err := json.Unmarshal(inrec, &cert_interface)
+		if err != nil {
+			response.Cert = cert_interface
+		}
+
 	}
 	if fetcher.IconMode {
 		encoded := base64.StdEncoding.EncodeToString(rawResp.Bytes())

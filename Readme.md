@@ -2,6 +2,7 @@
 PunkCrawler is a WebSpider with high speed(Actually it is a demo project to learn go for me).
 
 Thanks for [zgrab2](https://github.com/zmap/zgrab2)!
+tested on go1.14.4.
 
 ## main feature
 - configurable options for http.
