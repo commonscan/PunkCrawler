@@ -20,25 +20,27 @@ import (
 )
 
 type Fetcher struct {
-	InputFileName  string `short:"i" long:"input-file" description:"输入文件名" default:"-"`
-	OutputFileName string `short:"o" long:"output-file" description:"输出文件名" default:"-"`
-	ProcessNum     int    `short:"p" long:"process-num" description:"并发数" default:"100"`
-	Timeout        int32  `short:"t" long:"timeout" description:"最大超时数(s)" default:"30"`
-	Retries        int    `short:"r" long:"retries" description:"最大重试次数" default:"2"`
-	WithTitle      bool   `long:"with-title" description:"是否输出Title"`
-	WithHTML       bool   `long:"with-html" description:"是否输出HTML"`
-	WithTld        bool   `long:"with-tld" description:"是否输出TLD"`
-	WithIP         bool   `long:"with-ip" description:"是否输出IP"`
-	IconMode       bool   `long:"icon-mode" description:"输出Body的base64和hash"`
-	WithHeaders    bool   `long:"with-headers" description:"是否输出Headers"`
-	UserAgent      string `long:"user-agent" description:"User-Agent" default:"Mozilla/5.0 (compatible;Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)"`
-	WithCert       bool   `long:"with-cert" description:"是否输出HTTPS证书"`
-	WithLinks      bool   `long:"with-links" description:"是否输出链接信息"`
+	InputFileName          string `short:"i" long:"input-file" description:"输入文件名" default:"-"`
+	OutputFileName         string `short:"o" long:"output-file" description:"输出文件名" default:"-"`
+	ProcessNum             int    `short:"p" long:"process-num" description:"并发数" default:"100"`
+	Timeout                int32  `short:"t" long:"timeout" description:"最大超时数(s)" default:"30"`
+	Retries                int    `short:"r" long:"retries" description:"最大重试次数" default:"2"`
+	WithTitle              bool   `long:"with-title" description:"是否输出Title"`
+	WithHTML               bool   `long:"with-html" description:"是否输出HTML"`
+	WithTld                bool   `long:"with-tld" description:"是否输出TLD"`
+	WithIP                 bool   `long:"with-ip" description:"是否输出IP"`
+	IconMode               bool   `long:"icon-mode" description:"输出Body的base64和hash"`
+	WithHeaders            bool   `long:"with-headers" description:"是否输出Headers"`
+	UserAgent              string `long:"user-agent" description:"User-Agent" default:"Mozilla/5.0 (compatible;Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)"`
+	WithCert               bool   `long:"with-cert" description:"是否输出HTTPS证书"`
+	WithLinks              bool   `long:"with-links" description:"是否输出链接信息"`
+	FilterBinaryExtensions bool   `long:"filter-binary" description:"是否输出链接信息"`
 }
 
 var (
 	cache      = "/tmp/tld.cache"
 	extract, _ = tldextract.New(cache, false)
+	//binaryExtensions = []string{""}
 )
 
 func init() {
@@ -69,7 +71,7 @@ func (fetcher *Fetcher) EnrichResponse(response Response) Response {
 }
 func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 	r := req.New()
-	r.MaxReadSize = 1 * 1024 * 1024 * 10 // 10Mb
+	r.MaxReadSize = 1 * 1024 * 1024 // 1mb
 	req.SetTimeout(time.Duration(fetcher.Timeout) * time.Second)
 	var (
 		rawResp *req.Resp
