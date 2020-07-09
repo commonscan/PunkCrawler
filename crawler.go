@@ -44,7 +44,6 @@ var (
 )
 
 func init() {
-	req.Client().Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 }
 
 // enrich HTTP的response: ip\Cert\tld
@@ -71,6 +70,7 @@ func (fetcher *Fetcher) EnrichResponse(response Response) Response {
 }
 func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 	r := req.New()
+	req.Client().Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	r.MaxReadSize = 1 * 1024 * 1024 // 1mb
 	req.SetTimeout(time.Duration(fetcher.Timeout) * time.Second)
 	var (
