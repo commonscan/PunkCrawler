@@ -2,16 +2,17 @@ package coolCrawler
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/sha1"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/imfht/req"
+	"github.com/gojektech/heimdall/v6"
+	"github.com/gojektech/heimdall/v6/httpclient"
 	"github.com/joeguo/tldextract"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"strings"
@@ -38,12 +39,19 @@ type Fetcher struct {
 }
 
 var (
-	cache      = "/tmp/tld.cache"
-	extract, _ = tldextract.New(cache, false)
+	cache           = "/tmp/tld.cache"
+	extract, _      = tldextract.New(cache, false)
+	backoffInterval = 2 * time.Millisecond
+	// Define a maximum jitter interval. It must be more than 1*time.Millisecond
+	maximumJitterInterval = 5 * time.Millisecond
+	backoff               = heimdall.NewConstantBackoff(backoffInterval, maximumJitterInterval)
+
+	retrier = heimdall.NewRetrier(backoff)
 	//binaryExtensions = []string{""}
 )
 
 func init() {
+
 }
 
 // enrich HTTP的response: ip\Cert\tld
@@ -69,39 +77,47 @@ func (fetcher *Fetcher) EnrichResponse(response Response) Response {
 	return response
 }
 func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
-	r := req.New()
-	req.Client().Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	r.MaxReadSize = 1 * 1024 * 1024 // 1mb
-	req.SetTimeout(time.Duration(fetcher.Timeout) * time.Second)
-	var (
-		rawResp *req.Resp
-		err     error
+	timeout := 1000 * time.Millisecond
+
+	// Use the clients GET method to create and execute the request
+	client := httpclient.NewClient(
+		httpclient.WithHTTPTimeout(timeout),
+		httpclient.WithRetrier(retrier),
+		httpclient.WithRetryCount(4),
 	)
+	m := make(map[string]string)
+	m["User-Agent"] = "Baiduspider+(+http://www.baidu.com/search/spider.htm)"
+	header := http.Header{}
+	header.Add("User-Agent", "qq.com")
+	res, err := client.Get(targetUrl, header)
+	if err != nil {
+		return Response{}
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return Response{}
+	}
+	if err != nil {
+		panic(err)
+	}
 	if fetcher.Retries < 0 {
 		fetcher.Retries = 0
-	}
-
-	for i := 0; i <= fetcher.Retries; i++ {
-		rawResp, err = r.Get(targetUrl, req.Header{"User-Agent": fetcher.UserAgent})
-		if err == nil {
-			break
-		}
 	}
 	if err != nil {
 		return Response{Succeed: false, ErrorReason: err.Error(), URL: targetUrl, SourceURL: targetUrl, Time: JSONTime(time.Now())}
 	}
-	html, _ := rawResp.ToString()
-	statusCode := rawResp.Response().StatusCode
+	html := string(body)
+	statusCode := res.StatusCode
 	response := Response{
-		URL:        rawResp.Request().URL.String(),
+		URL:        res.Request.URL.String(),
 		StatusCode: statusCode,
 		Succeed:    true,
 		Time:       JSONTime(time.Now()),
 		SourceURL:  targetUrl,
 	}
-	if fetcher.WithCert && strings.HasPrefix(rawResp.Request().URL.String(), "https://") {
+	if fetcher.WithCert && strings.HasPrefix(res.Request.URL.String(), "https://") {
 		var cert_interface map[string]interface{}
-		inrec, _ := json.Marshal(rawResp.Response().TLS.PeerCertificates[0])
+		inrec, _ := json.Marshal(res.TLS.PeerCertificates[0])
 		err := json.Unmarshal(inrec, &cert_interface)
 		if err != nil {
 			response.Cert = cert_interface
@@ -109,12 +125,12 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 
 	}
 	if fetcher.IconMode {
-		encoded := base64.StdEncoding.EncodeToString(rawResp.Bytes())
+		encoded := base64.StdEncoding.EncodeToString(body)
 		response.B64Content = encoded
-		response.Hash = fmt.Sprintf("%x", sha1.Sum(rawResp.Bytes()))
+		response.Hash = fmt.Sprintf("%x", sha1.Sum(body))
 		return response
 	}
-	if fixedHtml, err := FixEncoding(html, rawResp.Response().Header.Get("Content-Type")); err == nil {
+	if fixedHtml, err := FixEncoding(html, res.Header.Get("Content-Type")); err == nil {
 		html = fixedHtml
 	}
 	if fetcher.WithLinks {
@@ -129,9 +145,8 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 		response.Title = title
 	}
 	if fetcher.WithHeaders {
-		buf := new(bytes.Buffer)
-		rawResp.Response().Header.Write(buf)
-		response.Headers = buf.String()
+		item, _ := httputil.DumpResponse(res, false)
+		response.Headers = string(item)
 	}
 	return fetcher.EnrichResponse(response)
 }
