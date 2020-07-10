@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/gojektech/heimdall/v6"
 	"github.com/gojektech/heimdall/v6/httpclient"
+	strip "github.com/grokify/html-strip-tags-go"
 	"github.com/joeguo/tldextract"
 	"io/ioutil"
 	"log"
@@ -15,6 +16,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +37,7 @@ type Fetcher struct {
 	UserAgent              string `long:"user-agent" description:"User-Agent" default:"Mozilla/5.0 (compatible;Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)"`
 	WithCert               bool   `long:"with-cert" description:"是否输出HTTPS证书"`
 	WithLinks              bool   `long:"with-links" description:"是否输出链接信息"`
+	WithText               bool   `long:"with-text" description:"是否解析纯文本"`
 	FilterBinaryExtensions bool   `long:"filter-binary" description:"是否输出链接信息"`
 }
 
@@ -148,7 +151,28 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 		item, _ := httputil.DumpResponse(res, false)
 		response.Headers = string(item)
 	}
+	if fetcher.WithText {
+		//p := bluemonday.StripTagsPolicy()
+		//html := p.Sanitize(string(body))
+		html := strip.StripTags(html)
+		if strings.HasPrefix(html, "<!DOCTYPE html>") {
+			html = strings.TrimLeft(html, "<!DOCTYPE html>")
+		}
+		// <!doctype html>
+		//html = strings.ReplaceAll(html, "\n ", "\n")
+		//html = strings.ReplaceAll(html, "\r\n ", "\n")
+		response.Text = removeLBR(removeDoctype(html))
+	}
 	return fetcher.EnrichResponse(response)
+}
+func removeDoctype(text string) string {
+	re := regexp.MustCompile(`(?i)<!doctype html>[ ]*`)
+	return re.ReplaceAllString(text, ``)
+
+}
+func removeLBR(text string) string {
+	re := regexp.MustCompile(`\x{000D}\x{000A}|[\x{000A}\x{000B}\x{000C}\x{000D}\x{0085}\x{2028}\x{2029}]`)
+	return re.ReplaceAllString(text, ``)
 }
 func (fetcher *Fetcher) Crawl(input chan string, output chan Response, group *sync.WaitGroup) {
 	defer group.Done()

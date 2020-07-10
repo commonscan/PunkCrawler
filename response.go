@@ -22,6 +22,7 @@ type Response struct {
 	Headers     string                 `json:"headers,omitempty"`
 	B64Content  string                 `json:"b64,omitempty"`
 	Hash        string                 `json:"hash,omitempty"`
+	Text        string                 `json:"text,omitempty"`
 	Cert        map[string]interface{} `json:"cert,omitempty"`
 }
 type DNSInfo struct {

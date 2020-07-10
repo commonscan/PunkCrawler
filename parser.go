@@ -76,10 +76,10 @@ func getLinks(text string, baseUrl string) (links []string) {
 					return
 				}
 			}
-			if strings.HasPrefix(uri, "javascript:") {
-				return
-			}
 			if !strings.HasPrefix(uri, "http") {
+				if strings.Contains(uri, ":") {
+					return
+				}
 				uri = joinURLs(baseUrl, uri)
 			}
 			if _, ok := dupeSet[uri]; !ok {
