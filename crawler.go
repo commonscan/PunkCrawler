@@ -88,17 +88,16 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 		httpclient.WithRetrier(retrier),
 		httpclient.WithRetryCount(4),
 	)
-	m := make(map[string]string)
-	m["User-Agent"] = "Baiduspider+(+http://www.baidu.com/search/spider.htm)"
+
 	header := http.Header{}
-	header.Add("User-Agent", "qq.com")
+	header.Add("User-Agent", "Baiduspider+(+http://www.baidu.com/search/spider.htm)")
 	res, err := client.Get(targetUrl, header)
 	if err != nil {
-		return Response{}
+		return Response{Succeed: false, ErrorReason: err.Error(), Time: JSONTime(time.Now())}
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return Response{}
+		return Response{Succeed: false, ErrorReason: err.Error()}
 	}
 	if err != nil {
 		panic(err)
@@ -119,11 +118,11 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 		SourceURL:  targetUrl,
 	}
 	if fetcher.WithCert && strings.HasPrefix(res.Request.URL.String(), "https://") {
-		var cert_interface map[string]interface{}
-		inrec, _ := json.Marshal(res.TLS.PeerCertificates[0])
-		err := json.Unmarshal(inrec, &cert_interface)
+		var certInterface map[string]interface{}
+		idref, _ := json.Marshal(res.TLS.PeerCertificates[0])
+		err := json.Unmarshal(idref, &certInterface)
 		if err != nil {
-			response.Cert = cert_interface
+			response.Cert = certInterface
 		}
 
 	}
