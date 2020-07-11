@@ -4,7 +4,8 @@ PunkCrawler is a WebSpider with high speed(Actually it is a demo project to lear
 Thanks for [zgrab2](https://github.com/zmap/zgrab2)!
 tested on go1.14.4.
 
-~~heimdall~~ do not support tls.
+**DO NOT USE THIS BRANCH**
+heimdall do not support tls cert ignore.
 ## main feature
 - configurable options for http.
 - high speed
