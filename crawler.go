@@ -34,12 +34,13 @@ type Fetcher struct {
 	UserAgent              string `long:"user-agent" description:"User-Agent" default:"Mozilla/5.0 (compatible;Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)"`
 	WithCert               bool   `long:"with-cert" description:"是否输出HTTPS证书"`
 	WithLinks              bool   `long:"with-links" description:"是否输出链接信息"`
-	FilterBinaryExtensions bool   `long:"filter-binary" description:"是否输出链接信息"`
+	FilterBinaryExtensions bool   `long:"filter-binary" description:"是否过滤已知的二进制后缀URL"`
 }
 
 var (
-	cache      = "/tmp/tld.cache"
-	extract, _ = tldextract.New(cache, false)
+	cache              = "/tmp/tld.cache"
+	extract, _         = tldextract.New(cache, false)
+	disabledExtentions = []string{".3ds", ".3g2", ".3gp", ".7z", ".DS_Store", ".a", ".aac", ".adp", ".ai", ".aif", ".aiff", ".apk", ".ar", ".asf", ".au", ".avi", ".bak", ".bin", ".bk", ".bmp", ".btif", ".bz2", ".cab", ".caf", ".cgm", ".cmx", ".cpio", ".cr2", ".dat", ".deb", ".djvu", ".dll", ".dmg", ".dmp", ".dng", ".doc", ".docx", ".dot", ".dotx", ".dra", ".dsk", ".dts", ".dtshd", ".dvb", ".dwg", ".dxf", ".ear", ".ecelp4800", ".ecelp7470", ".ecelp9600", ".egg", ".eol", ".eot", ".epub", ".exe", ".f4v", ".fbs", ".fh", ".fla", ".flac", ".fli", ".flv", ".fpx", ".fst", ".fvt", ".g3", ".gif", ".gz", ".h261", ".h263", ".h264", ".ico", ".ief", ".image", ".img", ".ipa", ".iso", ".jar", ".jpeg", ".jpg", ".jpgv", ".jpm", ".jxr", ".ktx", ".lvp", ".lz", ".lzma", ".lzo", ".m3u", ".m4a", ".m4v", ".mar", ".mdi", ".mid", ".mj2", ".mka", ".mkv", ".mmr", ".mng", ".mov", ".movie", ".mp3", ".mp4", ".mp4a", ".mpeg", ".mpg", ".mpga", ".mxu", ".nef", ".npx", ".o", ".oga", ".ogg", ".ogv", ".otf", ".pbm", ".pcx", ".pdf", ".pea", ".pgm", ".pic", ".png", ".pnm", ".ppm", ".pps", ".ppt", ".pptx", ".ps", ".psd", ".pya", ".pyc", ".pyo", ".pyv", ".qt", ".rar", ".ras", ".raw", ".rgb", ".rip", ".rlc", ".rz", ".s3m", ".s7z", ".scm", ".scpt", ".sgi", ".shar", ".sil", ".smv", ".so", ".sub", ".swf", ".tar", ".tbz2", ".tga", ".tgz", ".tif", ".tiff", ".tlz", ".ts", ".ttf", ".uvh", ".uvi", ".uvm", ".uvp", ".uvs", ".uvu", ".viv", ".vob", ".war", ".wav", ".wax", ".wbmp", ".wdp", ".weba", ".webm", ".webp", ".whl", ".wm", ".wma", ".wmv", ".wmx", ".woff", ".woff2", ".wvx", ".xbm", ".xif", ".xls", ".xlsx", ".xlt", ".xm", ".xpi", ".xpm", ".xwd", ".xz", ".z", ".zip", ".zipx"}
 	//binaryExtensions = []string{""}
 )
 
@@ -68,11 +69,21 @@ func (fetcher *Fetcher) EnrichResponse(response Response) Response {
 	}
 	return response
 }
+
+func HasDisableExtension(url string) bool {
+	for _, item := range disabledExtentions {
+		if strings.HasSuffix(strings.ToLower(url), item) {
+			return true
+		}
+	}
+	return false
+}
 func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 	r := req.New()
 	req.Client().Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	r.MaxReadSize = 1 * 1024 * 1024 // 1mb
 	req.SetTimeout(time.Duration(fetcher.Timeout) * time.Second)
+
 	var (
 		rawResp *req.Resp
 		err     error
@@ -80,7 +91,9 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 	if fetcher.Retries < 0 {
 		fetcher.Retries = 0
 	}
-
+	if fetcher.FilterBinaryExtensions && HasDisableExtension(targetUrl) {
+		return Response{Succeed: false, URL: targetUrl, SourceURL: targetUrl, Time: JSONTime(time.Now()), ErrorReason: "disabled extensions"}
+	}
 	for i := 0; i <= fetcher.Retries; i++ {
 		rawResp, err = r.Get(targetUrl, req.Header{"User-Agent": fetcher.UserAgent})
 		if err == nil {
@@ -100,13 +113,12 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 		SourceURL:  targetUrl,
 	}
 	if fetcher.WithCert && strings.HasPrefix(rawResp.Request().URL.String(), "https://") {
-		var cert_interface map[string]interface{}
+		var certInterface map[string]interface{}
 		inrec, _ := json.Marshal(rawResp.Response().TLS.PeerCertificates[0])
-		err := json.Unmarshal(inrec, &cert_interface)
+		err := json.Unmarshal(inrec, &certInterface)
 		if err != nil {
-			response.Cert = cert_interface
+			response.Cert = certInterface
 		}
-
 	}
 	if fetcher.IconMode {
 		encoded := base64.StdEncoding.EncodeToString(rawResp.Bytes())

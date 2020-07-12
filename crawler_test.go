@@ -10,3 +10,7 @@ func TestFetcher_DoRequest(t *testing.T) {
 	resp := fetcher.DoRequest("https://qq.com")
 	fmt.Println(resp.Title)
 }
+
+func TestHasDisableExtension(t *testing.T) {
+	fmt.Println(HasDisableExtension("http://qq.com/1.mp4"))
+}
