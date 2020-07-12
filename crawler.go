@@ -242,10 +242,16 @@ func (fetcher *Fetcher) Process() {
 	f := bufio.NewScanner(scanner)
 	for f.Scan() {
 		inputTxt := f.Text()
-		if !strings.HasPrefix(inputTxt, "http") {
-			inputTxt = "http://" + inputTxt
+		if strings.HasPrefix(inputTxt, "http") {
+			inputChan <- inputTxt
+		} else {
+			if strings.Contains(inputTxt[:10], ":") { // 如果前10个字符里面有 : ,我们认为有协议号了，直接跳过
+				continue
+			} else {
+				inputChan <- "http://" + inputTxt
+			}
 		}
-		inputChan <- inputTxt
+
 	}
 	close(inputChan)
 	fetchWg.Wait()
