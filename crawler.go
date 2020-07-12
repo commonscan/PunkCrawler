@@ -245,7 +245,11 @@ func (fetcher *Fetcher) Process() {
 		if strings.HasPrefix(inputTxt, "http") {
 			inputChan <- inputTxt
 		} else {
-			if strings.Contains(inputTxt[:10], ":") { // 如果前10个字符里面有 : ,我们认为有协议号了，直接跳过
+			var toRange = 0
+			if len(inputTxt) < 10 {
+				toRange = len(inputTxt)
+			}
+			if strings.Contains(inputTxt[:toRange], ":") { // 如果前10个字符里面有 : ,我们认为有协议号了，直接跳过
 				continue
 			} else {
 				inputChan <- "http://" + inputTxt
