@@ -266,7 +266,7 @@ func (fetcher *Fetcher) Process() {
 		inputUrl := f.Text()
 		if fetcher.PreScan {
 			if common.IsCIDR(inputUrl) {
-				if ips, err := common.GenerateIP(inputUrl); err != nil {
+				if ips, err := common.GenerateIP(inputUrl); err == nil {
 					for _, ip := range ips {
 						for _, port := range fetcher.Ports {
 							inputChan <- fmt.Sprintf("%s:%d", ip, port)
@@ -280,8 +280,10 @@ func (fetcher *Fetcher) Process() {
 			} else {
 				inputChan <- inputUrl
 			}
+		} else {
+			inputChan <- inputUrl
 		}
-		inputChan <- inputUrl
+
 	}
 	close(inputChan)
 	fetchWg.Wait()
