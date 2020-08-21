@@ -5,6 +5,7 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"log"
 	"os"
+	"strings"
 )
 
 func OutPutJson(pipe *os.File, output chan Response) {
@@ -35,7 +36,9 @@ func OutputTable(pipe *os.File, output chan Response) {
 		case response, ok := <-output:
 			if ok {
 				idx += 1
-				t.AppendRow(table.Row{idx, response.SourceURL, response.StatusCode, response.Title, response.Time.String()})
+				if response.Succeed {
+					t.AppendRow(table.Row{idx, response.SourceURL, response.StatusCode, strings.TrimSpace(response.Title), response.Time.String()})
+				}
 			} else {
 				return
 			}

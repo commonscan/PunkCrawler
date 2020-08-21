@@ -12,5 +12,6 @@ require (
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/joeguo/tldextract v0.0.0-20180214020933-b623e0574407
 	github.com/mattn/go-runewidth v0.0.9 // indirect
+	github.com/rs/zerolog v1.19.0
 	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
 )

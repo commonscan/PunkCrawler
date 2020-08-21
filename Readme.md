@@ -1,5 +1,9 @@
 # PunkCrawler
 PunkCrawler is a WebSpider with high speed(Actually it is a demo project to learn go for me).
+## usage
+```bash
+echo 202.120.7.213/24  | go run main.go --pre-scan --with-title --timeout=5 --ports 80,443 --table
+```
 
 Thanks for [zgrab2](https://github.com/zmap/zgrab2)!
 tested on go1.14.4.

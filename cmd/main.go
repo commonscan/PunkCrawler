@@ -3,6 +3,7 @@ package main
 import (
 	"coolCrawler"
 	"github.com/jessevdk/go-flags"
+	"github.com/rs/zerolog"
 	"log"
 )
 
@@ -11,6 +12,9 @@ func main() {
 	_, err := flags.Parse(&fetcher)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if fetcher.NoLog {
+		zerolog.SetGlobalLevel(zerolog.Disabled)
 	}
 	fetcher.Process()
 }

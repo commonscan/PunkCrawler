@@ -11,7 +11,8 @@ import (
 	"fmt"
 	"github.com/imfht/req"
 	"github.com/joeguo/tldextract"
-	"log"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"net"
 	"net/http"
 	"net/url"
@@ -40,6 +41,7 @@ type Fetcher struct {
 	Ports                  string `long:"ports" description:"扫描的端口，用 ,分割" default:"80,8080,443"`
 	OutPutTable            bool   `long:"table" description:"输出 table而不是json"`
 	FilterBinaryExtensions bool   `long:"filter-binary" description:"是否过滤已知的二进制后缀URL"`
+	NoLog                  bool   `long:"no-log" description:"不输出log信息"`
 }
 
 var (
@@ -49,6 +51,7 @@ var (
 )
 
 func init() {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 }
 
 // enrich HTTP的response: ip\Cert\tld
@@ -84,9 +87,9 @@ func HasDisableExtension(url string) bool {
 }
 func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 	r := req.New()
-	req.Client().Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	r.Client().Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	r.MaxReadSize = 1 * 1024 * 1024 // 1mb
-	req.SetTimeout(time.Duration(fetcher.Timeout) * time.Second)
+	r.SetTimeout(time.Duration(fetcher.Timeout) * time.Second)
 
 	var (
 		rawResp *req.Resp
@@ -105,6 +108,14 @@ func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 		}
 	}
 	if err != nil {
+		errorReason := err.Error()
+		if strings.Contains(strings.ToLower(err.Error()), "timeout") {
+			errorReason = "Timeout"
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "connection refused") {
+			errorReason = "PortClosed."
+		}
+		log.Warn().Msgf("failed get %s. error reason: %s", targetUrl, errorReason)
 		return Response{Succeed: false, ErrorReason: err.Error(), URL: targetUrl, SourceURL: targetUrl, Time: JSONTime(time.Now())}
 	}
 	html, _ := rawResp.ToString()
@@ -149,6 +160,7 @@ func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 		rawResp.Response().Header.Write(buf)
 		response.Headers = buf.String()
 	}
+	log.Info().Msgf("HTTP Request Succeed %s. [title: %s]", targetUrl, response.Title)
 	return fetcher.EnrichResponse(response)
 }
 
@@ -163,6 +175,14 @@ func (fetcher *Fetcher) DialPortService(hostPort string) (isOpen bool, Service s
 		return false, ""
 	} else {
 		defer conn.Close()
+		_, port, _ := net.SplitHostPort(hostPort)
+		if strings.Contains(port, "443") {
+			if err := tls.Client(conn, &tls.Config{InsecureSkipVerify: true}).Handshake(); err == nil {
+				return true, "https"
+			} else {
+				log.Warn().Msg(err.Error())
+			}
+		}
 		return true, "http"
 	}
 }
@@ -173,24 +193,27 @@ func (fetcher *Fetcher) Crawl(input chan string, output chan Response, group *sy
 	for {
 		select {
 		case inputUrl, ok := <-input:
-			if ok {
+			if !ok {
+				return
+			} else {
 				if fetcher.PreScan { // pre scan mode. 1.  scan ip port before send request.
 					if strings.Contains(inputUrl, ":") {
 						isOpen, Service := fetcher.DialPortService(inputUrl)
+						if isOpen {
+							log.Debug().Msgf("found [%s] %s port open ", Service, inputUrl)
+						}
 						if isOpen && strings.Contains(Service, "http") {
 							response := fetcher.DoHTTPRequest(fmt.Sprintf("%s://%s/", Service, inputUrl))
 							output <- response
 						}
+						continue
 					}
-				} else {
-					if !strings.HasPrefix(strings.ToLower(inputUrl), "http:") && !strings.HasPrefix(strings.ToLower(inputUrl), "https:") {
-						inputUrl = fmt.Sprintf("%s://%s", "http", inputUrl)
-					}
-					response := fetcher.DoHTTPRequest(inputUrl)
-					output <- response
 				}
-			} else {
-				return
+				if !strings.HasPrefix(strings.ToLower(inputUrl), "http:") && !strings.HasPrefix(strings.ToLower(inputUrl), "https:") {
+					inputUrl = fmt.Sprintf("%s://%s", "http", inputUrl)
+				}
+				response := fetcher.DoHTTPRequest(inputUrl)
+				output <- response
 			}
 		}
 	}
@@ -225,7 +248,7 @@ func (fetcher *Fetcher) OutputWorker(output chan Response, group *sync.WaitGroup
 	} else {
 		pipe, err = os.OpenFile(fetcher.OutputFileName, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal()
 		}
 	}
 	if fetcher.OutPutTable {
@@ -258,7 +281,7 @@ func (fetcher *Fetcher) Process() {
 		var err error
 		scanner, err = os.Open(fetcher.InputFileName)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal()
 		}
 	}
 	f := bufio.NewScanner(scanner)
@@ -266,12 +289,16 @@ func (fetcher *Fetcher) Process() {
 		inputUrl := f.Text()
 		if fetcher.PreScan {
 			if common.IsCIDR(inputUrl) {
-				if ips, err := common.GenerateIP(inputUrl); err == nil {
+				ips, err := common.GenerateIP(inputUrl)
+				if err == nil {
+					log.Info().Msgf("convert cidr [%s] -> [%d] ip", inputUrl, len(ips))
 					for _, ip := range ips {
-						for _, port := range fetcher.Ports {
-							inputChan <- fmt.Sprintf("%s:%d", ip, port)
+						for _, port := range strings.Split(fetcher.Ports, ",") {
+							inputChan <- fmt.Sprintf("%s:%s", ip, port)
 						}
 					}
+				} else {
+					log.Err(err)
 				}
 			} else if common.IsIp(inputUrl) {
 				for _, port := range strings.Split(fetcher.Ports, ",") {
@@ -287,7 +314,6 @@ func (fetcher *Fetcher) Process() {
 	}
 	close(inputChan)
 	fetchWg.Wait()
-	fmt.Println("done")
 	close(outputChan)
 	outputWg.Wait()
 }
