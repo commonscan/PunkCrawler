@@ -3,6 +3,7 @@ package coolCrawler
 import (
 	"bufio"
 	"bytes"
+	"coolCrawler/common"
 	"crypto/sha1"
 	"crypto/tls"
 	"encoding/base64"
@@ -11,6 +12,7 @@ import (
 	"github.com/imfht/req"
 	"github.com/joeguo/tldextract"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -34,6 +36,9 @@ type Fetcher struct {
 	UserAgent              string `long:"user-agent" description:"User-Agent" default:"Mozilla/5.0 (compatible;Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)"`
 	WithCert               bool   `long:"with-cert" description:"是否输出HTTPS证书"`
 	WithLinks              bool   `long:"with-links" description:"是否输出链接信息"`
+	PreScan                bool   `long:"pre-scan" description:"探测前先端口扫描"`
+	Ports                  string `long:"ports" description:"扫描的端口，用 ,分割" default:"80,8080,443"`
+	OutPutTable            bool   `long:"table" description:"输出 table而不是json"`
 	FilterBinaryExtensions bool   `long:"filter-binary" description:"是否过滤已知的二进制后缀URL"`
 }
 
@@ -41,7 +46,6 @@ var (
 	cache              = "/tmp/tld.cache"
 	extract, _         = tldextract.New(cache, false)
 	disabledExtentions = []string{".3ds", ".3g2", ".3gp", ".7z", ".DS_Store", ".a", ".aac", ".adp", ".ai", ".aif", ".aiff", ".apk", ".ar", ".asf", ".au", ".avi", ".bak", ".bin", ".bk", ".bmp", ".btif", ".bz2", ".cab", ".caf", ".cgm", ".cmx", ".cpio", ".cr2", ".dat", ".deb", ".djvu", ".dll", ".dmg", ".dmp", ".dng", ".doc", ".docx", ".dot", ".dotx", ".dra", ".dsk", ".dts", ".dtshd", ".dvb", ".dwg", ".dxf", ".ear", ".ecelp4800", ".ecelp7470", ".ecelp9600", ".egg", ".eol", ".eot", ".epub", ".exe", ".f4v", ".fbs", ".fh", ".fla", ".flac", ".fli", ".flv", ".fpx", ".fst", ".fvt", ".g3", ".gif", ".gz", ".h261", ".h263", ".h264", ".ico", ".ief", ".image", ".img", ".ipa", ".iso", ".jar", ".jpeg", ".jpg", ".jpgv", ".jpm", ".jxr", ".ktx", ".lvp", ".lz", ".lzma", ".lzo", ".m3u", ".m4a", ".m4v", ".mar", ".mdi", ".mid", ".mj2", ".mka", ".mkv", ".mmr", ".mng", ".mov", ".movie", ".mp3", ".mp4", ".mp4a", ".mpeg", ".mpg", ".mpga", ".mxu", ".nef", ".npx", ".o", ".oga", ".ogg", ".ogv", ".otf", ".pbm", ".pcx", ".pdf", ".pea", ".pgm", ".pic", ".png", ".pnm", ".ppm", ".pps", ".ppt", ".pptx", ".ps", ".psd", ".pya", ".pyc", ".pyo", ".pyv", ".qt", ".rar", ".ras", ".raw", ".rgb", ".rip", ".rlc", ".rz", ".s3m", ".s7z", ".scm", ".scpt", ".sgi", ".shar", ".sil", ".smv", ".so", ".sub", ".swf", ".tar", ".tbz2", ".tga", ".tgz", ".tif", ".tiff", ".tlz", ".ts", ".ttf", ".uvh", ".uvi", ".uvm", ".uvp", ".uvs", ".uvu", ".viv", ".vob", ".war", ".wav", ".wax", ".wbmp", ".wdp", ".weba", ".webm", ".webp", ".whl", ".wm", ".wma", ".wmv", ".wmx", ".woff", ".woff2", ".wvx", ".xbm", ".xif", ".xls", ".xlsx", ".xlt", ".xm", ".xpi", ".xpm", ".xwd", ".xz", ".z", ".zip", ".zipx"}
-	//binaryExtensions = []string{""}
 )
 
 func init() {
@@ -78,7 +82,7 @@ func HasDisableExtension(url string) bool {
 	}
 	return false
 }
-func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
+func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 	r := req.New()
 	req.Client().Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	r.MaxReadSize = 1 * 1024 * 1024 // 1mb
@@ -147,6 +151,22 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 	}
 	return fetcher.EnrichResponse(response)
 }
+
+//func (fetcher *Fetcher) WriteWithTimeout(conn net.Conn) ([]byte, error) {
+//
+//}
+
+func (fetcher *Fetcher) DialPortService(hostPort string) (isOpen bool, Service string) {
+	d := net.Dialer{Timeout: time.Duration(fetcher.Timeout) * time.Second}
+	conn, err := d.Dial("tcp", hostPort)
+	if err != nil {
+		return false, ""
+	} else {
+		defer conn.Close()
+		return true, "http"
+	}
+}
+
 func (fetcher *Fetcher) Crawl(input chan string, output chan Response, group *sync.WaitGroup) {
 	defer group.Done()
 	// input chan.
@@ -154,8 +174,21 @@ func (fetcher *Fetcher) Crawl(input chan string, output chan Response, group *sy
 		select {
 		case inputUrl, ok := <-input:
 			if ok {
-				response := fetcher.DoRequest(inputUrl)
-				output <- response
+				if fetcher.PreScan { // pre scan mode. 1.  scan ip port before send request.
+					if strings.Contains(inputUrl, ":") {
+						isOpen, Service := fetcher.DialPortService(inputUrl)
+						if isOpen && strings.Contains(Service, "http") {
+							response := fetcher.DoHTTPRequest(fmt.Sprintf("%s://%s/", Service, inputUrl))
+							output <- response
+						}
+					}
+				} else {
+					if !strings.HasPrefix(strings.ToLower(inputUrl), "http:") && !strings.HasPrefix(strings.ToLower(inputUrl), "https:") {
+						inputUrl = fmt.Sprintf("%s://%s", "http", inputUrl)
+					}
+					response := fetcher.DoHTTPRequest(inputUrl)
+					output <- response
+				}
 			} else {
 				return
 			}
@@ -195,24 +228,13 @@ func (fetcher *Fetcher) OutputWorker(output chan Response, group *sync.WaitGroup
 			log.Fatal(err)
 		}
 	}
-	var enc = json.NewEncoder(pipe)
-	enc.SetEscapeHTML(false)
+	if fetcher.OutPutTable {
+		OutputTable(pipe, output)
+	} else {
+		OutPutJson(pipe, output)
+	}
 	defer pipe.Close()
 	defer pipe.Sync()
-	for {
-		select {
-		case response, ok := <-output:
-			if ok {
-				//buf := new(bytes.Buffer)
-				if err = enc.Encode(&response); err != nil {
-					log.Fatal(err)
-				}
-			} else {
-				return
-			}
-		}
-	}
-	// generate a big file.
 }
 
 func (fetcher *Fetcher) Process() {
@@ -241,24 +263,29 @@ func (fetcher *Fetcher) Process() {
 	}
 	f := bufio.NewScanner(scanner)
 	for f.Scan() {
-		inputTxt := f.Text()
-		if strings.HasPrefix(inputTxt, "http") {
-			inputChan <- inputTxt
-		} else {
-			var toRange = 0
-			if len(inputTxt) < 10 {
-				toRange = len(inputTxt)
-			}
-			if strings.Contains(inputTxt[:toRange], ":") { // 如果前10个字符里面有 : ,我们认为有协议号了，直接跳过
-				continue
+		inputUrl := f.Text()
+		if fetcher.PreScan {
+			if common.IsCIDR(inputUrl) {
+				if ips, err := common.GenerateIP(inputUrl); err != nil {
+					for _, ip := range ips {
+						for _, port := range fetcher.Ports {
+							inputChan <- fmt.Sprintf("%s:%d", ip, port)
+						}
+					}
+				}
+			} else if common.IsIp(inputUrl) {
+				for _, port := range strings.Split(fetcher.Ports, ",") {
+					inputChan <- fmt.Sprintf("%s:%s", inputUrl, port)
+				}
 			} else {
-				inputChan <- "http://" + inputTxt
+				inputChan <- inputUrl
 			}
 		}
-
+		inputChan <- inputUrl
 	}
 	close(inputChan)
 	fetchWg.Wait()
+	fmt.Println("done")
 	close(outputChan)
 	outputWg.Wait()
 }

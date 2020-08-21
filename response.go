@@ -9,6 +9,7 @@ type JSONTime time.Time
 
 type Response struct {
 	IP          []string               `json:"ip,omitempty"`
+	Service     string                 `json:"service,omitempty"`
 	URL         string                 `json:"url,omitempty"`
 	Html        string                 `json:"html,omitempty"`
 	Title       string                 `json:"title,omitempty"`
@@ -39,4 +40,10 @@ func (t JSONTime) MarshalJSON() ([]byte, error) {
 	//do your serializing here
 	stamp := fmt.Sprintf("\"%s\"", time.Time(t).Format("2006-01-02 15:04:05"))
 	return []byte(stamp), nil
+}
+
+func (t JSONTime) String() string {
+	//do your serializing here
+	stamp := fmt.Sprintf("%s", time.Time(t).Format("2006-01-02 15:04:05"))
+	return stamp
 }
