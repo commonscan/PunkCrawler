@@ -7,7 +7,6 @@ import (
 	"crypto/sha1"
 	"crypto/tls"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"github.com/imfht/req"
 	"github.com/joeguo/tldextract"
@@ -127,13 +126,11 @@ func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 		Time:       JSONTime(time.Now()),
 		SourceURL:  targetUrl,
 	}
-	if fetcher.WithCert && strings.HasPrefix(rawResp.Request().URL.String(), "https://") {
-		var certInterface map[string]interface{}
-		inrec, _ := json.Marshal(rawResp.Response().TLS.PeerCertificates[0])
-		err := json.Unmarshal(inrec, &certInterface)
-		if err != nil {
-			response.Cert = certInterface
-		}
+	if strings.HasPrefix(rawResp.Request().URL.String(), "https://") {
+		//var certInterface map[string]interface{}
+		//inrec, _ := json.Marshal(rawResp.Response().TLS.PeerCertificates[0])
+		//err := json.Unmarshal(inrec, &certInterface)
+		response.Cert = rawResp.Response().TLS.PeerCertificates[0].DNSNames // only echo dns name
 	}
 	if fetcher.IconMode {
 		encoded := base64.StdEncoding.EncodeToString(rawResp.Bytes())
@@ -141,7 +138,7 @@ func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 		response.Hash = fmt.Sprintf("%x", sha1.Sum(rawResp.Bytes()))
 		return response
 	}
-	if fixedHtml, err := FixEncoding(html, rawResp.Response().Header.Get("Content-Type")); err == nil {
+	if fixedHtml, err := FixEncoding(rawResp.Bytes(), rawResp.Response().Header.Get("Content-Type")); err == nil {
 		html = fixedHtml
 	}
 	if fetcher.WithLinks {
@@ -252,9 +249,9 @@ func (fetcher *Fetcher) OutputWorker(output chan Response, group *sync.WaitGroup
 		}
 	}
 	if fetcher.OutPutTable {
-		OutputTable(pipe, output)
+		fetcher.OutputTable(pipe, output)
 	} else {
-		OutPutJson(pipe, output)
+		fetcher.OutPutJson(pipe, output)
 	}
 	defer pipe.Close()
 	defer pipe.Sync()
