@@ -16,5 +16,5 @@ func main() {
 	if fetcher.NoLog {
 		zerolog.SetGlobalLevel(zerolog.Disabled)
 	}
-	//fetcher.Process()
+	fetcher.Process()
 }
