@@ -1,10 +1,13 @@
 package coolCrawler
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/djimenez/iconv-go"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/net/html/charset"
+	"golang.org/x/text/transform"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"regexp"
@@ -91,8 +94,14 @@ func getLinks(text string, baseUrl string) (links []string) {
 	return links
 }
 
-func FixEncoding(input string, contentType string) (string, error) {
-	// e encoding.Encoding, name string, certain bool
-	_, encodingName, _ := charset.DetermineEncoding([]byte(input), contentType)
-	return iconv.ConvertString(input, encodingName, "utf8")
+func FixEncoding(resp []byte, chatSet string) (string, error) {
+	//return mahonia.NewDecoder(chatSet).ConvertString(input), nil
+	e, name, _ := charset.DetermineEncoding(resp, chatSet)
+	if name == "utf-8" {
+		log.Trace().Msg("page is utf-8, skip encoding convert.")
+		return string(resp), nil
+	}
+	utf8Reader := transform.NewReader(bytes.NewReader(resp), e.NewDecoder())
+	decoded, err := ioutil.ReadAll(utf8Reader)
+	return string(decoded), err
 }

@@ -3,14 +3,16 @@ package coolCrawler
 import (
 	"bufio"
 	"bytes"
+	"coolCrawler/common"
 	"crypto/sha1"
 	"crypto/tls"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"github.com/imfht/req"
 	"github.com/joeguo/tldextract"
-	"log"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -34,17 +36,21 @@ type Fetcher struct {
 	UserAgent              string `long:"user-agent" description:"User-Agent" default:"Mozilla/5.0 (compatible;Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)"`
 	WithCert               bool   `long:"with-cert" description:"是否输出HTTPS证书"`
 	WithLinks              bool   `long:"with-links" description:"是否输出链接信息"`
+	PreScan                bool   `long:"pre-scan" description:"探测前先端口扫描"`
+	Ports                  string `long:"ports" description:"扫描的端口，用 ,分割" default:"80,8080,443"`
+	OutPutTable            bool   `long:"table" description:"输出 table而不是json"`
 	FilterBinaryExtensions bool   `long:"filter-binary" description:"是否过滤已知的二进制后缀URL"`
+	NoLog                  bool   `long:"no-log" description:"不输出log信息"`
 }
 
 var (
 	cache              = "/tmp/tld.cache"
 	extract, _         = tldextract.New(cache, false)
 	disabledExtentions = []string{".3ds", ".3g2", ".3gp", ".7z", ".DS_Store", ".a", ".aac", ".adp", ".ai", ".aif", ".aiff", ".apk", ".ar", ".asf", ".au", ".avi", ".bak", ".bin", ".bk", ".bmp", ".btif", ".bz2", ".cab", ".caf", ".cgm", ".cmx", ".cpio", ".cr2", ".dat", ".deb", ".djvu", ".dll", ".dmg", ".dmp", ".dng", ".doc", ".docx", ".dot", ".dotx", ".dra", ".dsk", ".dts", ".dtshd", ".dvb", ".dwg", ".dxf", ".ear", ".ecelp4800", ".ecelp7470", ".ecelp9600", ".egg", ".eol", ".eot", ".epub", ".exe", ".f4v", ".fbs", ".fh", ".fla", ".flac", ".fli", ".flv", ".fpx", ".fst", ".fvt", ".g3", ".gif", ".gz", ".h261", ".h263", ".h264", ".ico", ".ief", ".image", ".img", ".ipa", ".iso", ".jar", ".jpeg", ".jpg", ".jpgv", ".jpm", ".jxr", ".ktx", ".lvp", ".lz", ".lzma", ".lzo", ".m3u", ".m4a", ".m4v", ".mar", ".mdi", ".mid", ".mj2", ".mka", ".mkv", ".mmr", ".mng", ".mov", ".movie", ".mp3", ".mp4", ".mp4a", ".mpeg", ".mpg", ".mpga", ".mxu", ".nef", ".npx", ".o", ".oga", ".ogg", ".ogv", ".otf", ".pbm", ".pcx", ".pdf", ".pea", ".pgm", ".pic", ".png", ".pnm", ".ppm", ".pps", ".ppt", ".pptx", ".ps", ".psd", ".pya", ".pyc", ".pyo", ".pyv", ".qt", ".rar", ".ras", ".raw", ".rgb", ".rip", ".rlc", ".rz", ".s3m", ".s7z", ".scm", ".scpt", ".sgi", ".shar", ".sil", ".smv", ".so", ".sub", ".swf", ".tar", ".tbz2", ".tga", ".tgz", ".tif", ".tiff", ".tlz", ".ts", ".ttf", ".uvh", ".uvi", ".uvm", ".uvp", ".uvs", ".uvu", ".viv", ".vob", ".war", ".wav", ".wax", ".wbmp", ".wdp", ".weba", ".webm", ".webp", ".whl", ".wm", ".wma", ".wmv", ".wmx", ".woff", ".woff2", ".wvx", ".xbm", ".xif", ".xls", ".xlsx", ".xlt", ".xm", ".xpi", ".xpm", ".xwd", ".xz", ".z", ".zip", ".zipx"}
-	//binaryExtensions = []string{""}
 )
 
 func init() {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 }
 
 // enrich HTTP的response: ip\Cert\tld
@@ -78,11 +84,11 @@ func HasDisableExtension(url string) bool {
 	}
 	return false
 }
-func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
+func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 	r := req.New()
-	req.Client().Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	r.Client().Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	r.MaxReadSize = 1 * 1024 * 1024 // 1mb
-	req.SetTimeout(time.Duration(fetcher.Timeout) * time.Second)
+	r.SetTimeout(time.Duration(fetcher.Timeout) * time.Second)
 
 	var (
 		rawResp *req.Resp
@@ -101,6 +107,14 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 		}
 	}
 	if err != nil {
+		errorReason := err.Error()
+		if strings.Contains(strings.ToLower(err.Error()), "timeout") {
+			errorReason = "Timeout"
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "connection refused") {
+			errorReason = "PortClosed."
+		}
+		log.Warn().Msgf("failed get %s. error reason: %s", targetUrl, errorReason)
 		return Response{Succeed: false, ErrorReason: err.Error(), URL: targetUrl, SourceURL: targetUrl, Time: JSONTime(time.Now())}
 	}
 	html, _ := rawResp.ToString()
@@ -112,13 +126,11 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 		Time:       JSONTime(time.Now()),
 		SourceURL:  targetUrl,
 	}
-	if fetcher.WithCert && strings.HasPrefix(rawResp.Request().URL.String(), "https://") {
-		var certInterface map[string]interface{}
-		inrec, _ := json.Marshal(rawResp.Response().TLS.PeerCertificates[0])
-		err := json.Unmarshal(inrec, &certInterface)
-		if err != nil {
-			response.Cert = certInterface
-		}
+	if strings.HasPrefix(rawResp.Request().URL.String(), "https://") {
+		//var certInterface map[string]interface{}
+		//inrec, _ := json.Marshal(rawResp.Response().TLS.PeerCertificates[0])
+		//err := json.Unmarshal(inrec, &certInterface)
+		response.Cert = rawResp.Response().TLS.PeerCertificates[0].DNSNames // only echo dns name
 	}
 	if fetcher.IconMode {
 		encoded := base64.StdEncoding.EncodeToString(rawResp.Bytes())
@@ -126,7 +138,7 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 		response.Hash = fmt.Sprintf("%x", sha1.Sum(rawResp.Bytes()))
 		return response
 	}
-	if fixedHtml, err := FixEncoding(html, rawResp.Response().Header.Get("Content-Type")); err == nil {
+	if fixedHtml, err := FixEncoding(rawResp.Bytes(), rawResp.Response().Header.Get("Content-Type")); err == nil {
 		html = fixedHtml
 	}
 	if fetcher.WithLinks {
@@ -145,19 +157,60 @@ func (fetcher *Fetcher) DoRequest(targetUrl string) Response {
 		rawResp.Response().Header.Write(buf)
 		response.Headers = buf.String()
 	}
+	log.Info().Msgf("HTTP Request Succeed %s. [title: %s]", targetUrl, response.Title)
 	return fetcher.EnrichResponse(response)
 }
+
+//func (fetcher *Fetcher) WriteWithTimeout(conn net.Conn) ([]byte, error) {
+//
+//}
+
+func (fetcher *Fetcher) DialPortService(hostPort string) (isOpen bool, Service string) {
+	d := net.Dialer{Timeout: time.Duration(fetcher.Timeout) * time.Second}
+	conn, err := d.Dial("tcp", hostPort)
+	if err != nil {
+		return false, ""
+	} else {
+		defer conn.Close()
+		_, port, _ := net.SplitHostPort(hostPort)
+		if strings.Contains(port, "443") {
+			if err := tls.Client(conn, &tls.Config{InsecureSkipVerify: true}).Handshake(); err == nil {
+				return true, "https"
+			} else {
+				log.Warn().Msg(err.Error())
+			}
+		}
+		return true, "http"
+	}
+}
+
 func (fetcher *Fetcher) Crawl(input chan string, output chan Response, group *sync.WaitGroup) {
 	defer group.Done()
 	// input chan.
 	for {
 		select {
 		case inputUrl, ok := <-input:
-			if ok {
-				response := fetcher.DoRequest(inputUrl)
-				output <- response
-			} else {
+			if !ok {
 				return
+			} else {
+				if fetcher.PreScan { // pre scan mode. 1.  scan ip port before send request.
+					if strings.Contains(inputUrl, ":") {
+						isOpen, Service := fetcher.DialPortService(inputUrl)
+						if isOpen {
+							log.Debug().Msgf("found [%s] %s port open ", Service, inputUrl)
+						}
+						if isOpen && strings.Contains(Service, "http") {
+							response := fetcher.DoHTTPRequest(fmt.Sprintf("%s://%s/", Service, inputUrl))
+							output <- response
+						}
+						continue
+					}
+				}
+				if !strings.HasPrefix(strings.ToLower(inputUrl), "http:") && !strings.HasPrefix(strings.ToLower(inputUrl), "https:") {
+					inputUrl = fmt.Sprintf("%s://%s", "http", inputUrl)
+				}
+				response := fetcher.DoHTTPRequest(inputUrl)
+				output <- response
 			}
 		}
 	}
@@ -192,27 +245,16 @@ func (fetcher *Fetcher) OutputWorker(output chan Response, group *sync.WaitGroup
 	} else {
 		pipe, err = os.OpenFile(fetcher.OutputFileName, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal()
 		}
 	}
-	var enc = json.NewEncoder(pipe)
-	enc.SetEscapeHTML(false)
+	if fetcher.OutPutTable {
+		fetcher.OutputTable(pipe, output)
+	} else {
+		fetcher.OutPutJson(pipe, output)
+	}
 	defer pipe.Close()
 	defer pipe.Sync()
-	for {
-		select {
-		case response, ok := <-output:
-			if ok {
-				//buf := new(bytes.Buffer)
-				if err = enc.Encode(&response); err != nil {
-					log.Fatal(err)
-				}
-			} else {
-				return
-			}
-		}
-	}
-	// generate a big file.
 }
 
 func (fetcher *Fetcher) Process() {
@@ -236,24 +278,34 @@ func (fetcher *Fetcher) Process() {
 		var err error
 		scanner, err = os.Open(fetcher.InputFileName)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal()
 		}
 	}
 	f := bufio.NewScanner(scanner)
 	for f.Scan() {
-		inputTxt := f.Text()
-		if strings.HasPrefix(inputTxt, "http") {
-			inputChan <- inputTxt
-		} else {
-			var toRange = 0
-			if len(inputTxt) < 10 {
-				toRange = len(inputTxt)
-			}
-			if strings.Contains(inputTxt[:toRange], ":") { // 如果前10个字符里面有 : ,我们认为有协议号了，直接跳过
-				continue
+		inputUrl := f.Text()
+		if fetcher.PreScan {
+			if common.IsCIDR(inputUrl) {
+				ips, err := common.GenerateIP(inputUrl)
+				if err == nil {
+					log.Info().Msgf("convert cidr [%s] -> [%d] ip", inputUrl, len(ips))
+					for _, ip := range ips {
+						for _, port := range strings.Split(fetcher.Ports, ",") {
+							inputChan <- fmt.Sprintf("%s:%s", ip, port)
+						}
+					}
+				} else {
+					log.Err(err)
+				}
+			} else if common.IsIp(inputUrl) {
+				for _, port := range strings.Split(fetcher.Ports, ",") {
+					inputChan <- fmt.Sprintf("%s:%s", inputUrl, port)
+				}
 			} else {
-				inputChan <- "http://" + inputTxt
+				inputChan <- inputUrl
 			}
+		} else {
+			inputChan <- inputUrl
 		}
 
 	}
