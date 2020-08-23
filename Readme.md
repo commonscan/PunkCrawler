@@ -46,9 +46,10 @@ echo 202.120.7.213/24  | go run main.go --pre-scan --with-title --timeout=5 --po
 | 32 | http://210.39.12.250:80/   |    200 | 统一身份认证             | 2020-08-21 17:43:19 |
 +----+----------------------------+--------+--------------------------+---------------------+
 ```
+## known issue
+日志在Powershell下展示不正常
+![image.png](/uploads/77FC6362DCAE448187528D40A454A2C6/image.png)
 
-Thanks for [zgrab2](https://github.com/zmap/zgrab2)!
-tested on go1.14.4.
 
 ## main feature
 - configurable options for http.
