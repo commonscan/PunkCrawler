@@ -12,6 +12,7 @@ builds:
       - windows
       - darwin
     main: ./cmd/main.go
+    ldflags: -s -w
     binary: ppscan
     id: ppscan
 archives:
@@ -20,6 +21,7 @@ archives:
       linux: Linux
       windows: Windows
       amd64: x86_64
+    format: zip
 checksum:
   name_template: 'checksums.txt'
 snapshot:

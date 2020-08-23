@@ -1,5 +1,10 @@
 # PunkCrawler
 PunkCrawler is a WebSpider with high speed(Actually it is a demo project to learn go for me).
+## release
+```
+goreleaser --rm-dist --skip-publish --skip-validate
+```
+
 ## usage
 ```bash
 echo 202.120.7.213/24  | go run main.go --pre-scan --with-title --timeout=5 --ports 80,443 --table 

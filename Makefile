@@ -15,6 +15,6 @@ gofmt:
 	goimports -w -l $(GO_FILES)
 
 punkspider: $(GO_FILES)
-	cd cmd/ && go build -o punk_crawler$(EXECUTABLE_EXTENSION) && cd ../..
-	rm -f punk_crawler
-	ln -s cmd/punk_crawler$(EXECUTABLE_EXTENSION) punk_crawler
+	cd cmd/ && go build -o ppscan$(EXECUTABLE_EXTENSION) && cd ../..
+	rm -f ppscan
+	ln -s cmd/ppscan$(EXECUTABLE_EXTENSION) ppscan
