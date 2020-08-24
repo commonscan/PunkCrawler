@@ -210,7 +210,7 @@ func (fetcher *Fetcher) Crawl(input chan string, output chan Response, group *sy
 				if !strings.HasPrefix(strings.ToLower(inputUrl), "http:") && !strings.HasPrefix(strings.ToLower(inputUrl), "https:") {
 					inputUrl = fmt.Sprintf("%s://%s", "http", inputUrl)
 				}
-				response := fetcher.DoHTTPRequest(fmt.Sprintf(inputUrl, fetcher.Endpoint))
+				response := fetcher.DoHTTPRequest(fmt.Sprintf("%s%s", inputUrl, fetcher.Endpoint))
 				output <- response
 			}
 		}
