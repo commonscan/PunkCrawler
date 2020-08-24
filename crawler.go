@@ -40,6 +40,7 @@ type Fetcher struct {
 	Ports                  string `long:"ports" description:"扫描的端口，用 ,分割" default:"80,8080,443"`
 	OutPutTable            bool   `long:"table" description:"输出 table而不是json"`
 	FilterBinaryExtensions bool   `long:"filter-binary" description:"是否过滤已知的二进制后缀URL"`
+	Endpoint               string `long:"endp" description:"endpoint" default:"/"`
 	NoLog                  bool   `long:"no-log" description:"不输出log信息"`
 }
 
@@ -200,7 +201,7 @@ func (fetcher *Fetcher) Crawl(input chan string, output chan Response, group *sy
 							log.Debug().Msgf("found [%s] %s port open ", Service, inputUrl)
 						}
 						if isOpen && strings.Contains(Service, "http") {
-							response := fetcher.DoHTTPRequest(fmt.Sprintf("%s://%s/", Service, inputUrl))
+							response := fetcher.DoHTTPRequest(fmt.Sprintf("%s://%s", Service, inputUrl))
 							output <- response
 						}
 						continue
@@ -209,7 +210,7 @@ func (fetcher *Fetcher) Crawl(input chan string, output chan Response, group *sy
 				if !strings.HasPrefix(strings.ToLower(inputUrl), "http:") && !strings.HasPrefix(strings.ToLower(inputUrl), "https:") {
 					inputUrl = fmt.Sprintf("%s://%s", "http", inputUrl)
 				}
-				response := fetcher.DoHTTPRequest(inputUrl)
+				response := fetcher.DoHTTPRequest(fmt.Sprintf(inputUrl, fetcher.Endpoint))
 				output <- response
 			}
 		}
