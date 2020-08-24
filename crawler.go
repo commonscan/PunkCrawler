@@ -33,6 +33,7 @@ type Fetcher struct {
 	WithIP                 bool   `long:"with-ip" description:"是否输出IP"`
 	IconMode               bool   `long:"icon-mode" description:"输出Body的base64和hash"`
 	WithHeaders            bool   `long:"with-headers" description:"是否输出Headers"`
+	DefaultHTTPS           bool   `long:"default-https" description:"没有协议号的域名默认使用https"`
 	UserAgent              string `long:"user-agent" description:"User-Agent" default:"Mozilla/5.0 (compatible;Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)"`
 	WithCert               bool   `long:"with-cert" description:"是否输出HTTPS证书"`
 	WithLinks              bool   `long:"with-links" description:"是否输出链接信息"`
@@ -52,6 +53,7 @@ var (
 
 func init() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	common.SetUlimitMax()
 }
 
 // enrich HTTP的response: ip\Cert\tld
@@ -90,7 +92,6 @@ func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 	r.Client().Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	r.MaxReadSize = 1 * 1024 * 1024 // 1mb
 	r.SetTimeout(time.Duration(fetcher.Timeout) * time.Second)
-
 	var (
 		rawResp *req.Resp
 		err     error
@@ -208,7 +209,11 @@ func (fetcher *Fetcher) Crawl(input chan string, output chan Response, group *sy
 					}
 				}
 				if !strings.HasPrefix(strings.ToLower(inputUrl), "http:") && !strings.HasPrefix(strings.ToLower(inputUrl), "https:") {
-					inputUrl = fmt.Sprintf("%s://%s", "http", inputUrl)
+					service := "http"
+					if fetcher.DefaultHTTPS {
+						service = "https"
+					}
+					inputUrl = fmt.Sprintf("%s://%s", service, inputUrl)
 				}
 				response := fetcher.DoHTTPRequest(fmt.Sprintf("%s%s", inputUrl, fetcher.Endpoint))
 				output <- response
@@ -314,6 +319,7 @@ func (fetcher *Fetcher) Process() {
 	fetchWg.Wait()
 	close(outputChan)
 	outputWg.Wait()
+	log.Debug().Msg("exit.")
 }
 
 func (fetcher *Fetcher) NeedFetch() bool { // 是否需要发送HTTP请求
