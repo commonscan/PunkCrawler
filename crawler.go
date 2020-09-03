@@ -132,7 +132,9 @@ func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 		//var certInterface map[string]interface{}
 		//inrec, _ := json.Marshal(rawResp.Response().TLS.PeerCertificates[0])
 		//err := json.Unmarshal(inrec, &certInterface)
-		response.Cert = rawResp.Response().TLS.PeerCertificates[0].DNSNames // only echo dns name
+		if len(rawResp.Response().TLS.PeerCertificates) > 0 {
+			response.Cert = rawResp.Response().TLS.PeerCertificates[0].DNSNames // only echo dns name
+		}
 	}
 	if fetcher.IconMode {
 		encoded := base64.StdEncoding.EncodeToString(rawResp.Bytes())
