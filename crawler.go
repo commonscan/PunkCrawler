@@ -88,6 +88,11 @@ func HasDisableExtension(url string) bool {
 	return false
 }
 func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Warn().Msgf("recover. %s . reason %s", targetUrl, err)
+		}
+	}()
 	r := req.New()
 	r.Client().Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	r.MaxReadSize = 1 * 1024 * 1024 // 1mb
