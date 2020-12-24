@@ -22,27 +22,28 @@ import (
 )
 
 type Fetcher struct {
-	InputFileName          string `short:"i" long:"input-file" description:"输入文件名" default:"-"`
-	OutputFileName         string `short:"o" long:"output-file" description:"输出文件名" default:"-"`
-	ProcessNum             int    `short:"p" long:"process-num" description:"并发数" default:"100"`
-	Timeout                int32  `short:"t" long:"timeout" description:"最大超时数(s)" default:"30"`
-	Retries                int    `short:"r" long:"retries" description:"最大重试次数" default:"2"`
-	WithTitle              bool   `long:"with-title" description:"是否输出Title"`
-	WithHTML               bool   `long:"with-html" description:"是否输出HTML"`
-	WithTld                bool   `long:"with-tld" description:"是否输出TLD"`
-	WithIP                 bool   `long:"with-ip" description:"是否输出IP"`
-	IconMode               bool   `long:"icon-mode" description:"输出Body的base64和hash"`
-	WithHeaders            bool   `long:"with-headers" description:"是否输出Headers"`
-	DefaultHTTPS           bool   `long:"default-https" description:"没有协议号的域名默认使用https"`
-	UserAgent              string `long:"user-agent" description:"User-Agent" default:"Mozilla/5.0 (compatible;Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)"`
-	WithCert               bool   `long:"with-cert" description:"是否输出HTTPS证书"`
-	WithLinks              bool   `long:"with-links" description:"是否输出链接信息"`
-	PreScan                bool   `long:"pre-scan" description:"探测前先端口扫描"`
-	Ports                  string `long:"ports" description:"扫描的端口，用 ,分割" default:"80,8080,443"`
-	OutPutTable            bool   `long:"table" description:"输出 table而不是json"`
-	FilterBinaryExtensions bool   `long:"filter-binary" description:"是否过滤已知的二进制后缀URL"`
-	Endpoint               string `long:"endp" description:"endpoint" default:"/"`
-	NoLog                  bool   `long:"no-log" description:"不输出log信息"`
+	InputFileName          string            `short:"i" long:"input-file" description:"输入文件名" default:"-"`
+	OutputFileName         string            `short:"o" long:"output-file" description:"输出文件名" default:"-"`
+	ProcessNum             int               `short:"p" long:"process-num" description:"并发数" default:"100"`
+	Timeout                int32             `short:"t" long:"timeout" description:"最大超时数(s)" default:"30"`
+	Retries                int               `short:"r" long:"retries" description:"最大重试次数" default:"2"`
+	WithTitle              bool              `long:"with-title" description:"是否输出Title"`
+	WithHTML               bool              `long:"with-html" description:"是否输出HTML"`
+	WithTld                bool              `long:"with-tld" description:"是否输出TLD"`
+	WithIP                 bool              `long:"with-ip" description:"是否输出IP"`
+	IconMode               bool              `long:"icon-mode" description:"输出Body的base64和hash"`
+	WithHeaders            bool              `long:"with-headers" description:"是否输出Headers"`
+	DefaultHTTPS           bool              `long:"default-https" description:"没有协议号的域名默认使用https"`
+	UserAgent              string            `long:"user-agent" description:"User-Agent" default:"Mozilla/5.0 (compatible;Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)"`
+	WithCert               bool              `long:"with-cert" description:"是否输出HTTPS证书"`
+	WithLinks              bool              `long:"with-links" description:"是否输出链接信息"`
+	PreScan                bool              `long:"pre-scan" description:"探测前先端口扫描"`
+	Ports                  string            `long:"ports" description:"扫描的端口，用 ,分割" default:"80,8080,443"`
+	OutPutTable            bool              `long:"table" description:"输出 table而不是json"`
+	FilterBinaryExtensions bool              `long:"filter-binary" description:"是否过滤已知的二进制后缀URL"`
+	Endpoint               string            `long:"endp" description:"endpoint" default:"/"`
+	NoLog                  bool              `long:"no-log" description:"不输出log信息"`
+	HTTPHeaders            map[string]string `long:"http_headers" description:"默认的HTTP Header"`
 }
 
 var (
@@ -107,8 +108,12 @@ func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 	if fetcher.FilterBinaryExtensions && HasDisableExtension(targetUrl) {
 		return Response{Succeed: false, URL: targetUrl, SourceURL: targetUrl, Time: JSONTime(time.Now()), ErrorReason: "disabled extensions"}
 	}
+	httpHeaders := req.Header{}
+	for k, v := range fetcher.HTTPHeaders {
+		httpHeaders[k] = v
+	}
 	for i := 0; i <= fetcher.Retries; i++ {
-		rawResp, err = r.Get(targetUrl, req.Header{"User-Agent": fetcher.UserAgent})
+		rawResp, err = r.Get(targetUrl, httpHeaders)
 		if err == nil {
 			break
 		}
@@ -297,7 +302,7 @@ func (fetcher *Fetcher) Process() {
 	f := bufio.NewScanner(scanner)
 	for f.Scan() {
 		inputUrl := f.Text()
-		if fetcher.PreScan {
+		if fetcher.PreScan { // 端口扫描模式
 			if common.IsCIDR(inputUrl) {
 				ips, err := common.GenerateIP(inputUrl)
 				if err == nil {
