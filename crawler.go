@@ -41,9 +41,14 @@ type Fetcher struct {
 	Ports                  string            `long:"ports" description:"扫描的端口，用 ,分割" default:"80,8080,443"`
 	OutPutTable            bool              `long:"table" description:"输出 table而不是json"`
 	FilterBinaryExtensions bool              `long:"filter-binary" description:"是否过滤已知的二进制后缀URL"`
+	AbortBinaryHeaders     bool              `long:"abort-binary-header" description:"启用此选项后，如果response header是已经的二进制，则放弃读取数据."`
 	Endpoint               string            `long:"endp" description:"endpoint" default:"/"`
 	NoLog                  bool              `long:"no-log" description:"不输出log信息"`
 	HTTPHeaders            map[string]string `long:"http_headers" description:"默认的HTTP Header"`
+	HTTPMethod             string            `long:"http_method" description:"http请求方法. eg: GET/POST/PATCH/DELETE/OPTIONS...." default:"GET"`
+	HTTPBody               string            `long:"http_body" description:"http body. 当 body为合法json的时候自动使用json提交"`
+	DryRun                 bool              `long:"dry_run" description:"向httpbin.org 发送请求以调试发包程序"`
+	MatchRule              string            `long:"match_rule" description:"判断是否存在漏洞"`
 }
 
 var (
@@ -113,7 +118,12 @@ func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 		httpHeaders[k] = v
 	}
 	for i := 0; i <= fetcher.Retries; i++ {
-		rawResp, err = r.Get(targetUrl, httpHeaders)
+		rawResp, err = r.Do(strings.ToUpper(fetcher.HTTPMethod), targetUrl, httpHeaders, fetcher.HTTPBody)
+		//if len(fetcher.HTTPBody) > 0 {
+		//	rawResp, err = r.Do(strings.ToUpper(fetcher.HTTPMethod), targetUrl, httpHeaders, fetcher.HTTPBody)
+		//} else {
+		//	rawResp, err = r.Do(strings.ToUpper(fetcher.HTTPMethod), targetUrl, httpHeaders)
+		//}
 		if err == nil {
 			break
 		}
