@@ -67,16 +67,17 @@ type Fetcher struct {
 
 	Debug        bool   `long:"debug" description:"向httpbin.org 发送请求以调试发包程序"`
 	NoLog        bool   `long:"no-log" description:"不输出log信息"`
-	OutputMode   string `long:"output-mode" description:"输出 table而不是json" default:"json"`
-	WithTitle    bool   `long:"with-title" description:"是否输出Title"`
-	WithHTML     bool   `long:"with-html" description:"是否输出HTML"`
-	WithTld      bool   `long:"with-tld" description:"是否输出TLD"`
-	WithIPv4     bool   `long:"with-ipv4" description:"是否输出IPv4地址"`
-	WithIPv6     bool   `long:"with-ip6" description:"是否输出IPv6地址"`
-	WithCert     bool   `long:"with-cert" description:"是否输出HTTPS证书"`
-	WithLinks    bool   `long:"with-links" description:"是否输出链接信息"`
-	WithHeaders  bool   `long:"with-headers" description:"是否输出Headers"`
-	WithGeoInfo  bool   `long:"with-geoinfo" description:"是否输出GEO信息"`
+	Output       string `long:"output" description:"输出 table而不是json" default:"json"`
+	NoTitle      bool   `long:"no-title" description:"是否输出Title"`
+	NoHtml       bool   `long:"no-html" description:"不输出HTMl"`
+	NoTld        bool   `long:"no-tld" description:"是否输出TLD"`
+	NoIPv4       bool   `long:"no-ipv4" description:"不输出IPv4地址"`
+	NoIPv6       bool   `long:"no-ipv6" description:"不输出IPv6地址"`
+	NoCerts      bool   `long:"no-cert" description:"是否输出HTTPS证书"`
+	NoServer     bool   `long:"no-server" description:"不输出Server字段"`
+	NoLink       bool   `long:"no-links" description:"不输出外链信息"`
+	NoHeaders    bool   `long:"no-headers" description:"不输出headers信息"`
+	NoGeoInfo    bool   `long:"no-geoinfo" description:"不输出GEO信息"`
 	BodyAsBinary bool   `long:"binary-body" description:"输出Body的base64和hash"`
 }
 
@@ -92,15 +93,17 @@ func init() {
 
 // enrich HTTP的response: ip\Cert\tld
 func (fetcher *Fetcher) EnrichResponse(response Response) Response {
-	if !(fetcher.WithTld || fetcher.WithIPv4 || fetcher.WithIPv6) { // do nothing
-		return response
+	if fetcher.NoLink {
+		response.Links = []string{}
 	}
-	if !fetcher.WithHTML {
+	if fetcher.NoHeaders {
+		response.Headers = ""
+	}
+	if fetcher.NoHtml {
 		response.Html = ""
 	}
-	if fetcher.WithTld {
-		response.Tld = getTld(response.URL)
-	}
+
+	response.TimeStamp = int(time.Now().Unix())
 	return response
 }
 
@@ -122,7 +125,7 @@ func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 		fetcher.Retries = 0
 	}
 	if fetcher.FilterBinaryExtensions && common.UrlHasDisableExtension(targetUrl) {
-		return Response{Succeed: false, URL: targetUrl, SourceURL: targetUrl, Time: JSONTime(time.Now()), ErrorReason: "disabled extensions"}
+		return Response{Succeed: false, URL: targetUrl, SourceURL: targetUrl, TimeStamp: int(time.Now().Unix()), ErrorReason: "disabled extensions"}
 	}
 	httpHeaders := req.Header{}
 	for k, v := range fetcher.HTTPHeaders {
@@ -135,11 +138,13 @@ func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 	} else {
 		response.Domain = parsedUrl.Host
 	}
-	if fetcher.WithIPv4 || fetcher.WithIPv6 { // 需要解析IP数据
+	if !fetcher.NoIPv4 {
 		response.IPv4Addr, err = getRemoteIPv4Addr(response.Domain)
+	}
+	if !fetcher.NoIPv6 {
 		response.IPv6Addr, err = getRemoteIPv6Addr(response.Domain)
 	}
-	if len(response.IPv4Addr) == 0 && len(response.IPv6Addr) > 0 {
+	if (!fetcher.NoIPv4 || !fetcher.NoIPv6) && len(response.IPv4Addr) == 0 && len(response.IPv6Addr) > 0 {
 		response.Succeed = false
 		response.ErrorReason = "DNSFailed/domain_no_ip"
 		return response
@@ -159,7 +164,7 @@ func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 			errorReason = "PortClosed."
 		}
 		log.Warn().Msgf("failed get %s. error reason: %s", targetUrl, errorReason)
-		return Response{Succeed: false, ErrorReason: err.Error(), URL: targetUrl, SourceURL: targetUrl, Time: JSONTime(time.Now())}
+		return Response{Succeed: false, ErrorReason: err.Error(), URL: targetUrl, SourceURL: targetUrl, TimeStamp: int(time.Now().Unix())}
 	}
 
 	response.StatusCode = rawResp.Response().StatusCode
@@ -181,18 +186,24 @@ func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 		}
 	}
 
-	if fetcher.WithLinks {
+	if !fetcher.NoLink {
 		rawLinks := getLinks(response.Html, targetUrl)
 		response.Links = rawLinks
 	}
-	if fetcher.WithTitle {
+	if !fetcher.NoTitle {
 		title := strings.TrimSpace(getTitle(response.Html))
 		response.Title = title
 	}
-	if fetcher.WithHeaders {
+	if !fetcher.NoHeaders {
 		buf := new(bytes.Buffer)
 		rawResp.Response().Header.Write(buf)
 		response.Headers = buf.String()
+	}
+	if !fetcher.NoServer {
+		response.Server = rawResp.Response().Header.Get("server")
+	}
+	if !fetcher.NoTld {
+		response.Tld = getTld(response.Domain)
 	}
 	log.Info().Msgf("HTTP Request Succeed %s. [title: %s]", targetUrl, response.Title)
 	return fetcher.EnrichResponse(response)
@@ -285,7 +296,7 @@ func (fetcher *Fetcher) OutputWorker(output chan Response, group *sync.WaitGroup
 			log.Fatal()
 		}
 	}
-	if fetcher.OutputMode == "table" {
+	if fetcher.Output == "table" {
 		fetcher.OutputTable(pipe, output)
 	} else {
 		fetcher.OutPutJson(pipe, output)
@@ -351,12 +362,4 @@ func (fetcher *Fetcher) Process() {
 	close(outputChan)
 	outputWg.Wait()
 	log.Debug().Msg("exit.")
-}
-
-func (fetcher *Fetcher) NeedFetch() bool { // 是否需要发送HTTP请求
-	if fetcher.WithHTML || fetcher.WithTitle || fetcher.WithLinks {
-		return true
-	} else {
-		return false
-	}
 }

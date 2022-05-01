@@ -12,19 +12,20 @@ type Response struct {
 	IPv6Addr    string   `json:"ipv6_addr"`
 	IPv4GeoInfo string   `json:"IPv4GeoInfo"`
 	IPv6GeoInfo string   `json:"IPv6GeoInfo"`
-	Service     string   `json:"service,omitempty"`
 	URL         string   `json:"url,omitempty"`
 	Html        string   `json:"html,omitempty"`
 	Title       string   `json:"title,omitempty"`
 	StatusCode  int      `json:"status_code,omitempty"`
 	Links       []string `json:"links,omitempty"`
-	Time        JSONTime `json:"time,omitempty"`
+	Time        string   `json:"-"`
+	TimeStamp   int      `json:"time"`
 	Succeed     bool     `json:"succeed,omitempty"`
 	ErrorReason string   `json:"error_reason,omitempty"`
 	SourceURL   string   `json:"source_url,omitempty"`
 	Tld         string   `json:"tld,omitempty"`
 	Domain      string   `json:"domain"`
 	Headers     string   `json:"headers,omitempty"`
+	Server      string   `json:"server,omitempty"`
 	B64Content  string   `json:"b64,omitempty"`
 	Hash        string   `json:"hash,omitempty"`
 	Cert        []string `json:"cert,omitempty"`

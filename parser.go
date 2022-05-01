@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/transform"
 	"io/ioutil"
@@ -122,7 +121,7 @@ func FixEncoding(resp []byte, chatSet string) (string, error) {
 	//return mahonia.NewDecoder(chatSet).ConvertString(input), nil
 	e, name, _ := charset.DetermineEncoding(resp, chatSet)
 	if name == "utf-8" {
-		log.Trace().Msg("page is utf-8, skip encoding convert.")
+		//log.Trace().Msg("page is utf-8, skip encoding convert.")
 		return string(resp), nil
 	}
 	utf8Reader := transform.NewReader(bytes.NewReader(resp), e.NewDecoder())

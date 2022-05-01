@@ -7,6 +7,7 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20200819183940-29e1ff8eb0bb
 	github.com/go-openapi/strfmt v0.19.5 // indirect
 	github.com/imfht/req v0.3.4
+	github.com/ip2location/ip2location-go/v9 v9.2.0
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/joeguo/tldextract v0.0.0-20180214020933-b623e0574407

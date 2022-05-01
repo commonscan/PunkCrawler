@@ -1,5 +1,4 @@
 package common
 
-func getIPGeoInfo(ip string) {
-
+func GetIPGeoInfo(ip string) {
 }
