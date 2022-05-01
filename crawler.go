@@ -21,40 +21,68 @@ import (
 	"time"
 )
 
+type Bool bool
+
+func (b *Bool) UnmarshalFlag(value string) error {
+	if value == "true" {
+		*b = true
+	} else if value == "false" {
+		*b = false
+	} else {
+		return fmt.Errorf("only `true' and `false' are valid values, not `%s'", value)
+	}
+
+	return nil
+}
+
+func (b Bool) MarshalFlag() string {
+	if b {
+		return "true"
+	}
+
+	return "false"
+}
+
 type Fetcher struct {
-	InputFileName          string            `short:"i" long:"input-file" description:"输入文件名" default:"-"`
-	OutputFileName         string            `short:"o" long:"output-file" description:"输出文件名" default:"-"`
-	ProcessNum             int               `short:"p" long:"process-num" description:"并发数" default:"100"`
-	Timeout                int32             `short:"t" long:"timeout" description:"最大超时数(s)" default:"30"`
-	Retries                int               `short:"r" long:"retries" description:"最大重试次数" default:"2"`
-	WithTitle              bool              `long:"with-title" description:"是否输出Title"`
-	WithHTML               bool              `long:"with-html" description:"是否输出HTML"`
-	WithTld                bool              `long:"with-tld" description:"是否输出TLD"`
-	WithIP                 bool              `long:"with-ip" description:"是否输出IP"`
-	IconMode               bool              `long:"icon-mode" description:"输出Body的base64和hash"`
-	WithHeaders            bool              `long:"with-headers" description:"是否输出Headers"`
-	DefaultHTTPS           bool              `long:"default-https" description:"没有协议号的域名默认使用https"`
-	UserAgent              string            `long:"user-agent" description:"User-Agent" default:"Mozilla/5.0 (compatible;Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)"`
-	WithCert               bool              `long:"with-cert" description:"是否输出HTTPS证书"`
-	WithLinks              bool              `long:"with-links" description:"是否输出链接信息"`
-	PreScan                bool              `long:"pre-scan" description:"探测前先端口扫描"`
-	Ports                  string            `long:"ports" description:"扫描的端口，用 ,分割" default:"80,8080,443"`
-	OutPutTable            bool              `long:"table" description:"输出 table而不是json"`
-	FilterBinaryExtensions bool              `long:"filter-binary" description:"是否过滤已知的二进制后缀URL"`
-	AbortBinaryHeaders     bool              `long:"abort-binary-header" description:"启用此选项后，如果response header是已经的二进制，则放弃读取数据."`
-	Endpoint               string            `long:"endp" description:"endpoint" default:"/"`
-	NoLog                  bool              `long:"no-log" description:"不输出log信息"`
-	HTTPHeaders            map[string]string `long:"http_headers" description:"默认的HTTP Header"`
-	HTTPMethod             string            `long:"http_method" description:"http请求方法. eg: GET/POST/PATCH/DELETE/OPTIONS...." default:"GET"`
-	HTTPBody               string            `long:"http_body" description:"http body. 当 body为合法json的时候自动使用json提交"`
-	DryRun                 bool              `long:"dry_run" description:"向httpbin.org 发送请求以调试发包程序"`
-	MatchRule              string            `long:"match_rule" description:"判断是否存在漏洞"`
+	InputFileName  string `short:"i" long:"input-file" description:"输入文件名" default:"-"`
+	OutputFileName string `short:"o" long:"output-file" description:"输出文件名" default:"-"`
+	ProcessNum     int    `short:"p" long:"process-num" description:"并发数" default:"100"`
+	Timeout        int32  `short:"t" long:"timeout" description:"最大超时数(s)" default:"30"`
+	Retries        int    `short:"r" long:"retries" description:"最大重试次数" default:"2"`
+
+	DefaultHTTPS Bool `long:"default-https" description:"没有协议号的域名默认使用https"`
+
+	PreScan bool   `long:"pre-scan" description:"探测前先端口扫描"`
+	Ports   string `long:"ports" description:"扫描的端口，用 ,分割" default:"80,8080,443"`
+
+	FilterBinaryExtensions bool `long:"filter-binary" description:"是否过滤已知的二进制后缀URL"`
+
+	UserAgent   string            `long:"user-agent" description:"User-Agent" default:"Mozilla/5.0 (compatible;Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)"`
+	HTTPHeaders map[string]string `long:"http_headers" description:"默认的HTTP Header"`
+	HTTPMethod  string            `long:"http_method" description:"http请求方法. eg: GET/POST/PATCH/DELETE/OPTIONS...." default:"GET"`
+	HTTPBody    string            `long:"http_body" description:"http body. 当 body为合法json的时候自动使用json提交"`
+	HTTPUri     string            `long:"endp" description:"endpoint" default:"/"`
+
+	AbortBinaryHeaders bool `long:"disable-binary-data" description:"启用此选项后，如果response header是已经的二进制，则放弃读取数据."`
+
+	Debug        bool   `long:"debug" description:"向httpbin.org 发送请求以调试发包程序"`
+	NoLog        bool   `long:"no-log" description:"不输出log信息"`
+	OutputMode   string `long:"output-mode" description:"输出 table而不是json" default:"json"`
+	WithTitle    bool   `long:"with-title" description:"是否输出Title"`
+	WithHTML     bool   `long:"with-html" description:"是否输出HTML"`
+	WithTld      bool   `long:"with-tld" description:"是否输出TLD"`
+	WithIPv4     bool   `long:"with-ipv4" description:"是否输出IPv4地址"`
+	WithIPv6     bool   `long:"with-ip6" description:"是否输出IPv6地址"`
+	WithCert     bool   `long:"with-cert" description:"是否输出HTTPS证书"`
+	WithLinks    bool   `long:"with-links" description:"是否输出链接信息"`
+	WithHeaders  bool   `long:"with-headers" description:"是否输出Headers"`
+	WithGeoInfo  bool   `long:"with-geoinfo" description:"是否输出GEO信息"`
+	BodyAsBinary bool   `long:"binary-body" description:"输出Body的base64和hash"`
 }
 
 var (
-	cache              = "/tmp/tld.cache"
-	extract, _         = tldextract.New(cache, false)
-	disabledExtentions = []string{".3ds", ".3g2", ".3gp", ".7z", ".DS_Store", ".a", ".aac", ".adp", ".ai", ".aif", ".aiff", ".apk", ".ar", ".asf", ".au", ".avi", ".bak", ".bin", ".bk", ".bmp", ".btif", ".bz2", ".cab", ".caf", ".cgm", ".cmx", ".cpio", ".cr2", ".dat", ".deb", ".djvu", ".dll", ".dmg", ".dmp", ".dng", ".doc", ".docx", ".dot", ".dotx", ".dra", ".dsk", ".dts", ".dtshd", ".dvb", ".dwg", ".dxf", ".ear", ".ecelp4800", ".ecelp7470", ".ecelp9600", ".egg", ".eol", ".eot", ".epub", ".exe", ".f4v", ".fbs", ".fh", ".fla", ".flac", ".fli", ".flv", ".fpx", ".fst", ".fvt", ".g3", ".gif", ".gz", ".h261", ".h263", ".h264", ".ico", ".ief", ".image", ".img", ".ipa", ".iso", ".jar", ".jpeg", ".jpg", ".jpgv", ".jpm", ".jxr", ".ktx", ".lvp", ".lz", ".lzma", ".lzo", ".m3u", ".m4a", ".m4v", ".mar", ".mdi", ".mid", ".mj2", ".mka", ".mkv", ".mmr", ".mng", ".mov", ".movie", ".mp3", ".mp4", ".mp4a", ".mpeg", ".mpg", ".mpga", ".mxu", ".nef", ".npx", ".o", ".oga", ".ogg", ".ogv", ".otf", ".pbm", ".pcx", ".pdf", ".pea", ".pgm", ".pic", ".png", ".pnm", ".ppm", ".pps", ".ppt", ".pptx", ".ps", ".psd", ".pya", ".pyc", ".pyo", ".pyv", ".qt", ".rar", ".ras", ".raw", ".rgb", ".rip", ".rlc", ".rz", ".s3m", ".s7z", ".scm", ".scpt", ".sgi", ".shar", ".sil", ".smv", ".so", ".sub", ".swf", ".tar", ".tbz2", ".tga", ".tgz", ".tif", ".tiff", ".tlz", ".ts", ".ttf", ".uvh", ".uvi", ".uvm", ".uvp", ".uvs", ".uvu", ".viv", ".vob", ".war", ".wav", ".wax", ".wbmp", ".wdp", ".weba", ".webm", ".webp", ".whl", ".wm", ".wma", ".wmv", ".wmx", ".woff", ".woff2", ".wvx", ".xbm", ".xif", ".xls", ".xlsx", ".xlt", ".xm", ".xpi", ".xpm", ".xwd", ".xz", ".z", ".zip", ".zipx"}
+	cache      = "/tmp/tld.cache"
+	extract, _ = tldextract.New(cache, false)
 )
 
 func init() {
@@ -64,20 +92,11 @@ func init() {
 
 // enrich HTTP的response: ip\Cert\tld
 func (fetcher *Fetcher) EnrichResponse(response Response) Response {
-	if !(fetcher.WithTld || fetcher.WithIP) { // do nothing
+	if !(fetcher.WithTld || fetcher.WithIPv4 || fetcher.WithIPv6) { // do nothing
 		return response
 	}
-	parsedUrl, _ := url.Parse(response.SourceURL)
-	var host string
-	if strings.Contains(host, ":") {
-		host = host[0:strings.Index(host, ":")]
-	} else {
-		host = parsedUrl.Host
-	}
-	if fetcher.WithIP {
-		if ip, err := getRemoteIP(host); err == nil {
-			response.IP = ip
-		}
+	if !fetcher.WithHTML {
+		response.Html = ""
 	}
 	if fetcher.WithTld {
 		response.Tld = getTld(response.URL)
@@ -85,15 +104,7 @@ func (fetcher *Fetcher) EnrichResponse(response Response) Response {
 	return response
 }
 
-func HasDisableExtension(url string) bool {
-	for _, item := range disabledExtentions {
-		if strings.HasSuffix(strings.ToLower(url), item) {
-			return true
-		}
-	}
-	return false
-}
-func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
+func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Warn().Msgf("recover. %s . reason %s", targetUrl, err)
@@ -110,20 +121,31 @@ func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 	if fetcher.Retries < 0 {
 		fetcher.Retries = 0
 	}
-	if fetcher.FilterBinaryExtensions && HasDisableExtension(targetUrl) {
+	if fetcher.FilterBinaryExtensions && common.UrlHasDisableExtension(targetUrl) {
 		return Response{Succeed: false, URL: targetUrl, SourceURL: targetUrl, Time: JSONTime(time.Now()), ErrorReason: "disabled extensions"}
 	}
 	httpHeaders := req.Header{}
 	for k, v := range fetcher.HTTPHeaders {
 		httpHeaders[k] = v
 	}
+	response := Response{SourceURL: targetUrl}
+	parsedUrl, _ := url.Parse(response.SourceURL)
+	if strings.Contains(parsedUrl.Host, ":") {
+		response.Domain = parsedUrl.Host[0:strings.Index(parsedUrl.Host, ":")]
+	} else {
+		response.Domain = parsedUrl.Host
+	}
+	if fetcher.WithIPv4 || fetcher.WithIPv6 { // 需要解析IP数据
+		response.IPv4Addr, err = getRemoteIPv4Addr(response.Domain)
+		response.IPv6Addr, err = getRemoteIPv6Addr(response.Domain)
+	}
+	if !(len(response.IPv4Addr) > 0 || len(response.IPv6Addr) > 0) {
+		response.Succeed = false
+		response.ErrorReason = "DNSFailed/domain_no_ip"
+		return response
+	}
 	for i := 0; i <= fetcher.Retries; i++ {
 		rawResp, err = r.Do(strings.ToUpper(fetcher.HTTPMethod), targetUrl, httpHeaders, fetcher.HTTPBody)
-		//if len(fetcher.HTTPBody) > 0 {
-		//	rawResp, err = r.Do(strings.ToUpper(fetcher.HTTPMethod), targetUrl, httpHeaders, fetcher.HTTPBody)
-		//} else {
-		//	rawResp, err = r.Do(strings.ToUpper(fetcher.HTTPMethod), targetUrl, httpHeaders)
-		//}
 		if err == nil {
 			break
 		}
@@ -139,41 +161,32 @@ func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 		log.Warn().Msgf("failed get %s. error reason: %s", targetUrl, errorReason)
 		return Response{Succeed: false, ErrorReason: err.Error(), URL: targetUrl, SourceURL: targetUrl, Time: JSONTime(time.Now())}
 	}
-	html, _ := rawResp.ToString()
-	statusCode := rawResp.Response().StatusCode
-	response := Response{
-		URL:        rawResp.Request().URL.String(),
-		StatusCode: statusCode,
-		Succeed:    true,
-		Time:       JSONTime(time.Now()),
-		SourceURL:  targetUrl,
-	}
+
+	response.StatusCode = rawResp.Response().StatusCode
+	response.Succeed = true
+
 	if strings.HasPrefix(rawResp.Request().URL.String(), "https://") {
-		//var certInterface map[string]interface{}
-		//inrec, _ := json.Marshal(rawResp.Response().TLS.PeerCertificates[0])
-		//err := json.Unmarshal(inrec, &certInterface)
 		if len(rawResp.Response().TLS.PeerCertificates) > 0 {
-			response.Cert = rawResp.Response().TLS.PeerCertificates[0].DNSNames // only echo dns name
+			response.Cert = rawResp.Response().TLS.PeerCertificates[0].DNSNames // tls info
 		}
 	}
-	if fetcher.IconMode {
+	response.Hash = fmt.Sprintf("%x", sha1.Sum(rawResp.Bytes()))
+	if fetcher.BodyAsBinary {
 		encoded := base64.StdEncoding.EncodeToString(rawResp.Bytes())
 		response.B64Content = encoded
-		response.Hash = fmt.Sprintf("%x", sha1.Sum(rawResp.Bytes()))
 		return response
+	} else {
+		if fixedHtml, err := FixEncoding(rawResp.Bytes(), rawResp.Response().Header.Get("Content-Type")); err == nil {
+			response.Html = fixedHtml
+		}
 	}
-	if fixedHtml, err := FixEncoding(rawResp.Bytes(), rawResp.Response().Header.Get("Content-Type")); err == nil {
-		html = fixedHtml
-	}
+
 	if fetcher.WithLinks {
-		rawLinks := getLinks(html, targetUrl)
+		rawLinks := getLinks(response.Html, targetUrl)
 		response.Links = rawLinks
 	}
-	if fetcher.WithHTML {
-		response.Html = html
-	}
 	if fetcher.WithTitle {
-		title := strings.TrimSpace(getTitle(html))
+		title := strings.TrimSpace(getTitle(response.Html))
 		response.Title = title
 	}
 	if fetcher.WithHeaders {
@@ -184,10 +197,6 @@ func (fetcher *Fetcher) DoHTTPRequest(targetUrl string) Response {
 	log.Info().Msgf("HTTP Request Succeed %s. [title: %s]", targetUrl, response.Title)
 	return fetcher.EnrichResponse(response)
 }
-
-//func (fetcher *Fetcher) WriteWithTimeout(conn net.Conn) ([]byte, error) {
-//
-//}
 
 func (fetcher *Fetcher) DialPortService(hostPort string) (isOpen bool, Service string) {
 	d := net.Dialer{Timeout: time.Duration(fetcher.Timeout) * time.Second}
@@ -224,7 +233,7 @@ func (fetcher *Fetcher) Crawl(input chan string, output chan Response, group *sy
 							log.Debug().Msgf("found [%s] %s port open ", Service, inputUrl)
 						}
 						if isOpen && strings.Contains(Service, "http") {
-							response := fetcher.DoHTTPRequest(fmt.Sprintf("%s://%s", Service, inputUrl))
+							response := fetcher.EnrichTarget(fmt.Sprintf("%s://%s", Service, inputUrl))
 							output <- response
 						}
 						continue
@@ -237,7 +246,7 @@ func (fetcher *Fetcher) Crawl(input chan string, output chan Response, group *sy
 					}
 					inputUrl = fmt.Sprintf("%s://%s", service, inputUrl)
 				}
-				response := fetcher.DoHTTPRequest(fmt.Sprintf("%s%s", inputUrl, fetcher.Endpoint))
+				response := fetcher.EnrichTarget(fmt.Sprintf("%s%s", inputUrl, fetcher.HTTPUri))
 				output <- response
 			}
 		}
@@ -276,7 +285,7 @@ func (fetcher *Fetcher) OutputWorker(output chan Response, group *sync.WaitGroup
 			log.Fatal()
 		}
 	}
-	if fetcher.OutPutTable {
+	if fetcher.OutputMode == "table" {
 		fetcher.OutputTable(pipe, output)
 	} else {
 		fetcher.OutPutJson(pipe, output)
