@@ -38,6 +38,7 @@ func (j *Fetcher) OutPutJson(pipe *os.File, output chan Response) {
 		}
 	}
 }
+
 func StringWithMax(str string, maxLen int) string {
 	if len(str) < maxLen {
 		return str
