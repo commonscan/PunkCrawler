@@ -25,3 +25,15 @@ func TestGetTLD(t *testing.T) {
 func TestGeoInfo(t *testing.T) {
 	common.GetIPGeoInfo("202.194.14.1")
 }
+
+func TestStack(t *testing.T) {
+	fmt.Println("qq.com IPv4 Available", common.IPv4Available("http://qq.com"))
+	fmt.Println("qq.com IPv6 Available", common.IPv6Available("http://qq.com"))
+
+	fmt.Println("www.sjtu.edu.cn IPv4 Available", common.IPv4Available("http://www.sjtu.edu.cn"))
+	fmt.Println("www.sjtu.edu.cn IPv6 Available", common.IPv6Available("http://www.sjtu.edu.cn"))
+}
+
+func TestIPInfo(t *testing.T) {
+	fmt.Println("202.194.14.1 info", common.GetIPv4Info("202.194.7.118"))
+}

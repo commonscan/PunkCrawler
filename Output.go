@@ -1,14 +1,20 @@
 package coolCrawler
 
 import (
+	"coolCrawler/common"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/jedib0t/go-pretty/table"
 	"log"
 	"os"
 	"strings"
 )
 
+func getuuid4String() string {
+	var geneator, _ = uuid.NewUUID()
+	return geneator.String()
+}
 func (j *Fetcher) OutPutJson(pipe *os.File, output chan Response) {
 	var enc = json.NewEncoder(pipe)
 	enc.SetEscapeHTML(false)
@@ -16,6 +22,10 @@ func (j *Fetcher) OutPutJson(pipe *os.File, output chan Response) {
 		select {
 		case response, ok := <-output:
 			if ok {
+				response.DataUUID = getuuid4String()
+				if j.WithIPInfo && len(response.IPv4Addr) > 0 {
+					response.IPv4GeoInfo = common.GetIPv4Info(response.IPv4Addr)
+				}
 				if !j.NoCerts && len(response.Cert) > 0 {
 					response.Cert = []string{}
 				}
@@ -58,5 +68,4 @@ func (j *Fetcher) OutputTable(pipe *os.File, output chan Response) {
 			}
 		}
 	}
-
 }

@@ -79,6 +79,10 @@ type Fetcher struct {
 	NoHeaders    bool   `long:"no-headers" description:"不输出headers信息"`
 	NoGeoInfo    bool   `long:"no-geoinfo" description:"不输出GEO信息"`
 	BodyAsBinary bool   `long:"binary-body" description:"输出Body的base64和hash"`
+
+	WithIPStackStatus bool `long:"with-ip-stack-status" description:"输出IP信息的适配情况"`
+	WithSSLStatus     bool `long:"with-ssl-status" description:"输出网站是否适配SSL"`
+	WithIPInfo        bool `long:"with-ip-info" description:"输出网站是否适配SSL"`
 }
 
 var (
@@ -102,7 +106,6 @@ func (fetcher *Fetcher) EnrichResponse(response Response) Response {
 	if fetcher.NoHtml {
 		response.Html = ""
 	}
-
 	response.TimeStamp = int(time.Now().Unix())
 	return response
 }
@@ -175,7 +178,7 @@ func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 			response.Cert = rawResp.Response().TLS.PeerCertificates[0].DNSNames // tls info
 		}
 	}
-	response.Hash = fmt.Sprintf("%x", sha1.Sum(rawResp.Bytes()))
+	response.WebHash = fmt.Sprintf("%x", sha1.Sum(rawResp.Bytes()))
 	if fetcher.BodyAsBinary {
 		encoded := base64.StdEncoding.EncodeToString(rawResp.Bytes())
 		response.B64Content = encoded
@@ -206,6 +209,17 @@ func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 		response.Tld = getTld(response.Domain)
 	}
 	log.Info().Msgf("HTTP Request Succeed %s. [title: %s]", targetUrl, response.Title)
+	if fetcher.WithIPStackStatus {
+		response.IPv6Available = common.IPv6Available(targetUrl)
+		response.IPv4Available = common.IPv4Available(targetUrl)
+	}
+	if fetcher.WithSSLStatus {
+		if strings.HasPrefix(targetUrl, "https") {
+			response.SslOK = true
+		} else {
+			response.SslOK = common.SSLAvailable(response.Domain)
+		}
+	}
 	return fetcher.EnrichResponse(response)
 }
 
