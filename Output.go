@@ -35,6 +35,7 @@ func StringWithMax(str string, maxLen int) string {
 		return fmt.Sprintf("%s ...(%d chars)", str[0:maxLen], len(str))
 	}
 }
+
 func (j *Fetcher) OutputTable(pipe *os.File, output chan Response) {
 	t := table.NewWriter()
 	t.SetOutputMirror(pipe)

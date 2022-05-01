@@ -8,7 +8,10 @@ import (
 type JSONTime time.Time
 
 type Response struct {
-	IP          []string `json:"ip,omitempty"`
+	IPv4Addr    string   `json:"ipv4_addr"`
+	IPv6Addr    string   `json:"ipv6_addr"`
+	IPv4GeoInfo string   `json:"IPv4GeoInfo"`
+	IPv6GeoInfo string   `json:"IPv6GeoInfo"`
 	Service     string   `json:"service,omitempty"`
 	URL         string   `json:"url,omitempty"`
 	Html        string   `json:"html,omitempty"`
@@ -20,10 +23,11 @@ type Response struct {
 	ErrorReason string   `json:"error_reason,omitempty"`
 	SourceURL   string   `json:"source_url,omitempty"`
 	Tld         string   `json:"tld,omitempty"`
+	Domain      string   `json:"domain"`
 	Headers     string   `json:"headers,omitempty"`
 	B64Content  string   `json:"b64,omitempty"`
 	Hash        string   `json:"hash,omitempty"`
-	Cert        []string   `json:"cert,omitempty"`
+	Cert        []string `json:"cert,omitempty"`
 }
 type DNSInfo struct {
 	Domain string   `json:"domain"`

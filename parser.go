@@ -2,6 +2,7 @@ package coolCrawler
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/rs/zerolog/log"
@@ -37,6 +38,29 @@ func getTitle(text string) string {
 		return ""
 	}
 }
+func getRemoteIPv4Addr(host string) (string, error) {
+	if net.ParseIP(host).To4() != nil {
+		return net.ParseIP(host).To4().String(), nil
+	}
+	hosts, err := net.DefaultResolver.LookupIP(context.Background(), "ip4", host)
+	if err != nil {
+		return "", err
+	} else {
+		return hosts[0].String(), err
+	}
+}
+func getRemoteIPv6Addr(host string) (string, error) {
+	if net.ParseIP(host).To4() != nil {
+		return net.ParseIP(host).To4().String(), nil
+	}
+	hosts, err := net.DefaultResolver.LookupIP(context.Background(), "ip6", host)
+	if err != nil {
+		return "", err
+	} else {
+		return hosts[0].String(), err
+	}
+}
+
 func getRemoteIP(host string) ([]string, error) {
 	if net.ParseIP(host).To4() != nil {
 		return []string{net.ParseIP(host).To4().String()}, nil

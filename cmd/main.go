@@ -10,7 +10,7 @@ func main() {
 	var fetcher coolCrawler.Fetcher
 	_, err := flags.Parse(&fetcher)
 	if err != nil {
-		//log.Fatal(err)
+		//fmt.Println(err)
 		return
 	}
 	if fetcher.NoLog {
