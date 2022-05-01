@@ -139,7 +139,7 @@ func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 		response.IPv4Addr, err = getRemoteIPv4Addr(response.Domain)
 		response.IPv6Addr, err = getRemoteIPv6Addr(response.Domain)
 	}
-	if !(len(response.IPv4Addr) > 0 || len(response.IPv6Addr) > 0) {
+	if len(response.IPv4Addr) == 0 && len(response.IPv6Addr) > 0 {
 		response.Succeed = false
 		response.ErrorReason = "DNSFailed/domain_no_ip"
 		return response
