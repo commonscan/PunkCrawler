@@ -10,12 +10,14 @@ import (
 	"fmt"
 	"github.com/imfht/req"
 	"github.com/joeguo/tldextract"
+	"github.com/microcosm-cc/bluemonday"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -83,6 +85,7 @@ type Fetcher struct {
 	WithIPStackStatus bool `long:"with-ip-stack-status" description:"输出IP信息的适配情况"`
 	WithSSLStatus     bool `long:"with-ssl-status" description:"输出网站是否适配SSL"`
 	WithIPInfo        bool `long:"with-ip-info" description:"输出网站是否适配SSL"`
+	WithCleanedHtml   bool `long:"with-cleaned-html" description:"输出去掉标签的HTML"`
 }
 
 var (
@@ -97,13 +100,11 @@ func init() {
 
 // enrich HTTP的response: ip\Cert\tld
 func (fetcher *Fetcher) EnrichResponse(response Response) Response {
-	if len(response.Domain) == 0 {
-		parsedUrl, _ := url.Parse(response.SourceURL)
-		if strings.Contains(parsedUrl.Host, ":") {
-			response.Domain = parsedUrl.Host[0:strings.Index(parsedUrl.Host, ":")]
-		} else {
-			response.Domain = parsedUrl.Host
-		}
+	if fetcher.WithCleanedHtml {
+		p := bluemonday.StrictPolicy()
+		var html = p.Sanitize(response.Html)
+		re := regexp.MustCompile(`(?m)^\s*$[\r\n]*|[\r\n]+\s+\z`)
+		response.CleanedHtml = re.ReplaceAllString(html, "")
 	}
 	if fetcher.NoLink {
 		response.Links = []string{}

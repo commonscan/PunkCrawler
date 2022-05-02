@@ -17,6 +17,7 @@ type Response struct {
 	IPv6GeoInfo   string   `json:"ipv6_info"`
 	URL           string   `json:"url,omitempty"`
 	Html          string   `json:"html,omitempty"`
+	CleanedHtml   string   `json:"clean_html,omitempty"`
 	Title         string   `json:"title,omitempty"`
 	StatusCode    int      `json:"status_code,omitempty"`
 	Links         []string `json:"links,omitempty"`
