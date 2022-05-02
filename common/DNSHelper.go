@@ -62,7 +62,7 @@ func SSLAvailable(domain string) bool {
 func GetIPv4Info(ipv4addr string) string {
 	var req = req.Req{}
 	req.SetTimeout(time.Duration(time.Second * 10))
-	resp, err := req.Get("http://localhost:8888/q?ip=" + ipv4addr)
+	resp, err := req.Get("http://43.131.50.200:8888/q?ip=" + ipv4addr)
 	if err != nil {
 		log.Warn().Msgf("获取IP信息失败，url %s", "http://localhost:8888/q?ip="+ipv4addr)
 		return ""
