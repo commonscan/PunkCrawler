@@ -17,11 +17,13 @@ func getuuid4String() string {
 }
 func (j *Fetcher) OutPutJson(pipe *os.File, output chan Response) {
 	var enc = json.NewEncoder(pipe)
+
 	enc.SetEscapeHTML(false)
 	for {
 		select {
 		case response, ok := <-output:
 			if ok {
+				response = j.EnrichResponse(response)
 				response.DataUUID = getuuid4String()
 				if j.WithIPInfo && len(response.IPv4Addr) > 0 {
 					response.IPv4GeoInfo = common.GetIPv4Info(response.IPv4Addr)

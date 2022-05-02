@@ -97,8 +97,19 @@ func init() {
 
 // enrich HTTP的response: ip\Cert\tld
 func (fetcher *Fetcher) EnrichResponse(response Response) Response {
+	if len(response.Domain) == 0 {
+		parsedUrl, _ := url.Parse(response.SourceURL)
+		if strings.Contains(parsedUrl.Host, ":") {
+			response.Domain = parsedUrl.Host[0:strings.Index(parsedUrl.Host, ":")]
+		} else {
+			response.Domain = parsedUrl.Host
+		}
+	}
 	if fetcher.NoLink {
 		response.Links = []string{}
+	}
+	if !fetcher.NoTld {
+		response.Tld = getTld(response.Domain)
 	}
 	if fetcher.NoHeaders {
 		response.Headers = ""
@@ -106,6 +117,7 @@ func (fetcher *Fetcher) EnrichResponse(response Response) Response {
 	if fetcher.NoHtml {
 		response.Html = ""
 	}
+
 	response.TimeStamp = int(time.Now().Unix())
 	return response
 }
@@ -124,22 +136,26 @@ func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 		rawResp *req.Resp
 		err     error
 	)
+	var Domain string
+	parsedUrl, _ := url.Parse(targetUrl)
+	if strings.Contains(parsedUrl.Host, ":") {
+		Domain = parsedUrl.Host[0:strings.Index(parsedUrl.Host, ":")]
+	} else {
+		Domain = parsedUrl.Host
+	}
+	response := Response{SourceURL: targetUrl, Domain: Domain, Tld: getTld(Domain)}
 	if fetcher.Retries < 0 {
 		fetcher.Retries = 0
 	}
 	if fetcher.FilterBinaryExtensions && common.UrlHasDisableExtension(targetUrl) {
-		return Response{Succeed: false, URL: targetUrl, SourceURL: targetUrl, TimeStamp: int(time.Now().Unix()), ErrorReason: "disabled extensions"}
+		response.Succeed = false
+		response.SourceURL = targetUrl
+		response.ErrorReason = "BlackList/DisabledExtensions"
+		return response
 	}
 	httpHeaders := req.Header{}
 	for k, v := range fetcher.HTTPHeaders {
 		httpHeaders[k] = v
-	}
-	response := Response{SourceURL: targetUrl}
-	parsedUrl, _ := url.Parse(response.SourceURL)
-	if strings.Contains(parsedUrl.Host, ":") {
-		response.Domain = parsedUrl.Host[0:strings.Index(parsedUrl.Host, ":")]
-	} else {
-		response.Domain = parsedUrl.Host
 	}
 	if !fetcher.NoIPv4 {
 		response.IPv4Addr, err = getRemoteIPv4Addr(response.Domain)
@@ -149,7 +165,7 @@ func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 	}
 	if (len(response.IPv4Addr) == 0 && !fetcher.NoIPv4) && (len(response.IPv6Addr) == 0 && !fetcher.NoIPv6) {
 		response.Succeed = false
-		response.ErrorReason = "DNSFailed/domain_no_ip"
+		response.ErrorReason = "DNSFailed/DomainNoIP"
 		return response
 	}
 	for i := 0; i <= fetcher.Retries; i++ {
@@ -167,9 +183,10 @@ func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 			errorReason = "PortClosed."
 		}
 		log.Warn().Msgf("failed get %s. error reason: %s", targetUrl, errorReason)
-		return Response{Succeed: false, ErrorReason: err.Error(), URL: targetUrl, SourceURL: targetUrl, TimeStamp: int(time.Now().Unix())}
+		response.Succeed = false
+		response.ErrorReason = errorReason
+		return response
 	}
-
 	response.StatusCode = rawResp.Response().StatusCode
 	response.Succeed = true
 
@@ -205,9 +222,7 @@ func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 	if !fetcher.NoServer {
 		response.Server = rawResp.Response().Header.Get("server")
 	}
-	if !fetcher.NoTld {
-		response.Tld = getTld(response.Domain)
-	}
+
 	log.Info().Msgf("HTTP Request Succeed %s. [title: %s]", targetUrl, response.Title)
 	if fetcher.WithIPStackStatus {
 		response.IPv6Available = common.IPv6Available(targetUrl)
@@ -220,7 +235,7 @@ func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 			response.SslOK = common.SSLAvailable(response.Domain)
 		}
 	}
-	return fetcher.EnrichResponse(response)
+	return response
 }
 
 func (fetcher *Fetcher) DialPortService(hostPort string) (isOpen bool, Service string) {
@@ -346,6 +361,9 @@ func (fetcher *Fetcher) Process() {
 	f := bufio.NewScanner(scanner)
 	for f.Scan() {
 		inputUrl := f.Text()
+		if inputUrl == "" {
+			continue
+		}
 		if fetcher.PreScan { // 端口扫描模式
 			if common.IsCIDR(inputUrl) {
 				ips, err := common.GenerateIP(inputUrl)
