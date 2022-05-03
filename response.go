@@ -8,19 +8,19 @@ import (
 type JSONTime time.Time
 
 type Response struct {
-	IPv4Addr      string   `json:"ipv4_addr"`
-	IPv6Addr      string   `json:"ipv6_addr"`
-	IPv4Available bool     `json:"ipv4_ok"`
-	SslOK         bool     `json:"ssl_ok"`
-	IPv6Available bool     `json:"ipv6_ok"`
-	IPv4GeoInfo   string   `json:"ipv4_info"`
-	IPv6GeoInfo   string   `json:"ipv6_info"`
+	IPv4Addr      string   `json:"ipv4_addr,omitempty"`
+	IPv6Addr      string   `json:"ipv6_addr,omitempty"`
+	IPv4Available bool     `json:"ipv4_ok,omitempty"`
+	SslOK         bool     `json:"ssl_ok,omitempty"`
+	IPv6Available bool     `json:"ipv6_ok,omitempty"`
+	IPv4GeoInfo   string   `json:"ipv4_info,omitempty"`
+	IPv6GeoInfo   string   `json:"ipv6_info,omitempty"`
 	URL           string   `json:"url,omitempty"`
 	Html          string   `json:"html,omitempty"`
 	CleanedHtml   string   `json:"cleaned_html,omitempty"`
 	Title         string   `json:"title,omitempty"`
 	StatusCode    int      `json:"status_code,omitempty"`
-	Links         []string `json:"links"`
+	Links         []string `json:"links.omitempty"`
 	Time          string   `json:"-"`
 	TimeStamp     int      `json:"time"`
 	Succeed       bool     `json:"succeed,omitempty"`
