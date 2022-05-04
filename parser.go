@@ -37,6 +37,20 @@ func getTitle(text string) string {
 		return ""
 	}
 }
+func getKeyWordDescription(text string) (description string, keywords string) {
+	rootNode, err := goquery.NewDocumentFromReader(strings.NewReader(text))
+	if err != nil {
+		return "", ""
+	}
+
+	rootNode.Find("meta[name='description']").Each(func(i int, s *goquery.Selection) {
+		description, _ = s.Attr("content")
+	})
+	rootNode.Find("meta[name='keywords']").Each(func(i int, s *goquery.Selection) {
+		description, _ = s.Attr("content")
+	})
+	return description, keywords
+}
 func getRemoteIPv4Addr(host string) (string, error) {
 	if net.ParseIP(host).To4() != nil {
 		return net.ParseIP(host).To4().String(), nil

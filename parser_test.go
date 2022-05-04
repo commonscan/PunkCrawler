@@ -37,3 +37,7 @@ func TestStack(t *testing.T) {
 func TestIPInfo(t *testing.T) {
 	fmt.Println("202.194.14.1 info", common.GetIPv4Info("202.194.7.118"))
 }
+
+func TestDescription(t *testing.T) {
+	getKeyWordDescription("<html>  <title>PuerkitoBio/goquery: A little like that j-thing, only in Go.</title>\n    <meta name=\"description\" content=\"A little like that j-thing, only in Go. Contribute to PuerkitoBio/goquery development by creating an account on GitHub.\">\n    <link rel=\"search\" type=\"application/opensearchdescription+xml\" href=\"/opensearch.xml\" title=\"GitHub\"> </html>")
+}

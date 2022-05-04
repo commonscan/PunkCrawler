@@ -86,6 +86,7 @@ type Fetcher struct {
 	WithSSLStatus     bool `long:"with-ssl-status" description:"输出网站是否适配SSL"`
 	WithIPInfo        bool `long:"with-ip-info" description:"输出网站是否适配SSL"`
 	WithCleanedHtml   bool `long:"with-cleaned-html" description:"输出去掉标签的HTML"`
+	WithSEOInfo       bool `long:"with-seo-info" description:"输出Description和Keywords"`
 }
 
 var (
@@ -118,7 +119,9 @@ func (fetcher *Fetcher) EnrichResponse(response Response) Response {
 	if fetcher.NoHtml {
 		response.Html = ""
 	}
-
+	if fetcher.WithSEOInfo {
+		response.Description, response.Keywords = getKeyWordDescription(response.Html)
+	}
 	response.TimeStamp = int(time.Now().Unix())
 	return response
 }

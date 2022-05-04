@@ -34,6 +34,8 @@ type Response struct {
 	WebHash       string   `json:"web_hash,omitempty"`
 	DataUUID      string   `json:"data_uuid"`
 	Cert          []string `json:"cert,omitempty"`
+	Keywords      string   `json:"keywords,omitempty"`
+	Description   string   `json:"description,omitempty"`
 }
 type DNSInfo struct {
 	Domain string   `json:"domain"`
