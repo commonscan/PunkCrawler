@@ -20,7 +20,7 @@ type Response struct {
 	CleanedHtml   string   `json:"cleaned_html,omitempty"`
 	Title         string   `json:"title,omitempty"`
 	StatusCode    int      `json:"status_code,omitempty"`
-	Links         []string `json:"links.omitempty"`
+	Links         []string `json:"links,omitempty"`
 	Time          string   `json:"-"`
 	TimeStamp     int      `json:"time"`
 	Succeed       bool     `json:"succeed,omitempty"`
