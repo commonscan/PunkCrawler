@@ -107,6 +107,9 @@ func (fetcher *Fetcher) EnrichResponse(response Response) Response {
 		re := regexp.MustCompile(`(?m)^\s*$[\r\n]*|[\r\n]+\s+\z`)
 		response.CleanedHtml = re.ReplaceAllString(html, "")
 	}
+	if fetcher.WithSEOInfo {
+		response.Description, response.Keywords = getKeyWordDescription(response.Html)
+	}
 	if fetcher.NoLink {
 		response.Links = []string{}
 	}
@@ -116,11 +119,8 @@ func (fetcher *Fetcher) EnrichResponse(response Response) Response {
 	if fetcher.NoHeaders {
 		response.Headers = ""
 	}
-	if fetcher.NoHtml {
+	if fetcher.NoHtml { // fixme: 准备一个输出function比较好
 		response.Html = ""
-	}
-	if fetcher.WithSEOInfo {
-		response.Description, response.Keywords = getKeyWordDescription(response.Html)
 	}
 	response.TimeStamp = int(time.Now().Unix())
 	return response
