@@ -234,7 +234,11 @@ func (fetcher *Fetcher) EnrichTarget(targetUrl string) Response {
 	}
 	if fetcher.WithSSLStatus {
 		if strings.HasPrefix(targetUrl, "https") {
-			response.SslOK = true
+			if response.StatusCode == 200 || response.StatusCode == 301 || response.StatusCode == 302 {
+				response.SslOK = true
+			} else {
+				response.SslOK = false
+			}
 		} else {
 			response.SslOK = common.SSLAvailable(response.Domain)
 		}

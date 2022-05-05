@@ -51,7 +51,10 @@ func IPv6Available(url string) bool {
 func SSLAvailable(domain string) bool {
 	uri := fmt.Sprintf("https://%s/", domain)
 	client := http.Client{Timeout: 10 * time.Second}
-	_, err := client.Head(uri)
+	resp, err := client.Head(uri)
+	if resp.StatusCode == 200 || (resp.StatusCode == 301 || resp.StatusCode == 302) {
+		return true
+	}
 	if err == nil {
 		return true
 	} else {
