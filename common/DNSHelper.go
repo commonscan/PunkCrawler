@@ -52,14 +52,13 @@ func SSLAvailable(domain string) bool {
 	uri := fmt.Sprintf("https://%s/", domain)
 	client := http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Head(uri)
-	if resp.StatusCode == 200 || (resp.StatusCode == 301 || resp.StatusCode == 302) {
-		return true
-	}
-	if err == nil {
-		return true
-	} else {
+	if err != nil {
 		return false
 	}
+	if resp.StatusCode == 200 || (resp.StatusCode == 301 || resp.StatusCode == 302) { // SSLOK: 仅仅200或者30x才认为OK
+		return true
+	}
+	return false
 }
 
 func GetIPv4Info(ipv4addr string) string {
