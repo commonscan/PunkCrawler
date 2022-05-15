@@ -1,7 +1,6 @@
 package coolCrawler
 
 import (
-	"coolCrawler/common"
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
@@ -26,7 +25,7 @@ func (j *Fetcher) OutPutJson(pipe *os.File, output chan Response) {
 				response = j.EnrichResponse(response)
 				response.DataUUID = getuuid4String()
 				if j.WithIPInfo && len(response.IPv4Addr) > 0 {
-					response.IPv4GeoInfo = common.GetIPv4Info(response.IPv4Addr)
+					response.IPv4GeoInfo = j.GetIPv4Info(response.IPv4Addr)
 				}
 				if !j.NoCerts && len(response.Cert) > 0 {
 					response.Cert = []string{}

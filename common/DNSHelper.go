@@ -3,9 +3,6 @@ package common
 import (
 	"context"
 	"fmt"
-	"github.com/imfht/req"
-	"github.com/rs/zerolog/log"
-	"github.com/tidwall/gjson"
 	"net"
 
 	"net/http"
@@ -59,17 +56,4 @@ func SSLAvailable(domain string) bool {
 		return true
 	}
 	return false
-}
-
-func GetIPv4Info(ipv4addr string) string {
-	var req = req.Req{}
-	req.SetTimeout(time.Duration(time.Second * 10))
-	resp, err := req.Get("http://43.131.50.200:8888/q?ip=" + ipv4addr)
-	if err != nil {
-		log.Warn().Msgf("获取IP信息失败，url %s", "http://localhost:8888/q?ip="+ipv4addr)
-		return ""
-	}
-	data := resp.String()
-	return fmt.Sprintf("%s|%s|%s|%s", gjson.Get(data, "country_name"), gjson.Get(data, "region_name"),
-		gjson.Get(data, "city_name"), gjson.Get(data, "isp_domain"))
 }

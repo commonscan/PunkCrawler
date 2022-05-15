@@ -13,6 +13,7 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/tidwall/gjson"
 	"net"
 	"net/http"
 	"net/url"
@@ -87,6 +88,8 @@ type Fetcher struct {
 	WithIPInfo        bool `long:"with-ip-info" description:"输出网站是否适配SSL"`
 	WithCleanedHtml   bool `long:"with-cleaned-html" description:"输出去掉标签的HTML"`
 	WithSEOInfo       bool `long:"with-seo-info" description:"输出Description和Keywords"`
+
+	IPIPServer string `long:"ipip-server" default:"http://127.0.0.1:8888" description:"输出Description和Keywords"`
 }
 
 var (
@@ -340,6 +343,20 @@ func (fetcher *Fetcher) OutputWorker(output chan Response, group *sync.WaitGroup
 	}
 	defer pipe.Close()
 	defer pipe.Sync()
+}
+
+func (fetcher *Fetcher) GetIPv4Info(ipv4addr string) string {
+	var req = req.Req{}
+	req.SetTimeout(time.Duration(time.Second * 10))
+	targetUrl := fmt.Sprintf("%s/q?ip=%s", fetcher.IPIPServer, ipv4addr)
+	resp, err := req.Get(targetUrl)
+	if err != nil {
+		log.Warn().Msgf("获取IP信息失败，url %s", targetUrl)
+		return ""
+	}
+	data := resp.String()
+	return fmt.Sprintf("%s|%s|%s|%s", gjson.Get(data, "country_name"), gjson.Get(data, "region_name"),
+		gjson.Get(data, "city_name"), gjson.Get(data, "isp_domain"))
 }
 
 func (fetcher *Fetcher) Process() {
